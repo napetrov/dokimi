@@ -21,6 +21,7 @@ Two properties are enforced here rather than hoped for:
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 from dataclasses import dataclass, field
@@ -315,16 +316,14 @@ def extract_atoms(
     from dokimi.llm import extract_json_array
 
     report = report if report is not None else ExtractionReport()
-    valid_ids = {span.id for span in spans}
 
-    def parse(reply: str) -> list:
+    def parse(reply: str, valid_ids: set[str]) -> list:
         rows = extract_json_array(reply)
         if rows and not any(_atom_from_row(row, valid_ids) for row in rows):
             # `[]` says the spans assert nothing; rows that are not atoms say nothing.
             raise _NoUsableRows(f"{len(rows)} rows, none an atom of this document")
         return rows
 
-    usable = accepting(parse)  # so the response cache never keeps a bad reply
     for span in spans:
         span.unread = False
     seen: set[str] = set()
@@ -344,6 +343,10 @@ def extract_atoms(
         prompt = _EXTRACT_PROMPT.format(
             kinds=", ".join(ATOM_KINDS), tags=", ".join(ATOM_TAGS), spans=render_spans(batch)
         )
+        # Only the batch's own spans: the extractor never saw the others, so a row citing
+        # one is not provenance, and a reply made only of such rows reads nothing.
+        batch_ids = {span.id for span in batch}
+        usable = accepting(functools.partial(parse, valid_ids=batch_ids))  # cache no bad reply
         unparseable = False
         try:
             report.calls += 1
@@ -358,7 +361,7 @@ def extract_atoms(
                 _mark_unread(batch, report)
                 continue
             unparseable = True
-            rows = parse(reply)
+            rows = parse(reply, batch_ids)
         except Exception as exc:
             if unparseable and len(batch) > 1:
                 # Unparseable, most often truncated: re-ask the two halves, in place,
@@ -382,7 +385,7 @@ def extract_atoms(
             _mark_unread(batch, report)
             continue
         for row in rows:
-            atom = _atom_from_row(row, valid_ids)
+            atom = _atom_from_row(row, batch_ids)
             if atom is None or atom.id in seen:
                 continue
             seen.add(atom.id)
@@ -403,6 +406,12 @@ def _mark_unread(batch: list[Span], report: ExtractionReport) -> None:
     report.unread_tokens += sum(span.tokens for span in batch)
 
 
+def _listed(value: object) -> list | tuple:
+    """A row's list field, or nothing: ``null``, a number or a bare string is not a list
+    (iterating ``"s0001"`` would yield its characters)."""
+    return value if isinstance(value, (list, tuple)) else ()
+
+
 def _atom_from_row(row: object, valid_ids: set[str]) -> Atom | None:
     if not isinstance(row, dict):
         return None
@@ -410,13 +419,13 @@ def _atom_from_row(row: object, valid_ids: set[str]) -> Atom | None:
     question = str(row.get("question") or "").strip()
     if not statement or not question:
         return None
-    span_ids = tuple(str(s) for s in row.get("span_ids", ()) if str(s) in valid_ids)
+    span_ids = tuple(str(s) for s in _listed(row.get("span_ids")) if str(s) in valid_ids)
     if not span_ids:
         # No provenance means the atom cannot be attributed to text, protected, or
         # coloured. Counting it would inflate every per-artifact number.
         return None
     kind = str(row.get("kind") or "proposition")
-    tags = tuple(str(t) for t in row.get("tags", ()) if str(t) in ATOM_TAGS)
+    tags = tuple(str(t) for t in _listed(row.get("tags")) if str(t) in ATOM_TAGS)
     return Atom(
         statement=statement,
         question=question,

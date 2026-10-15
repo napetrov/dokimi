@@ -458,3 +458,72 @@ def test_the_last_error_names_a_call_then_a_parse_then_an_unusable_then_an_empty
     _spans, report = _mixed_causes(causes)
     assert report.last_error.startswith(first)
     assert "_NoUsableRows" not in report.last_error
+
+
+def _row(sid: str, **extra) -> dict:
+    return {"statement": f"{sid} holds a default.", "question": f"What is {sid}?",
+            "span_ids": [sid], **extra}
+
+
+def test_a_row_citing_only_a_span_outside_its_batch_is_not_an_atom():
+    # The extractor saw only its batch; an id from another batch is not provenance,
+    # so a reply made of such rows leaves the batch unread instead of reading as empty.
+    spans = segment(DOC)
+    first = {s.id for s in spans[:5]}
+
+    def elsewhere(prompt, system):
+        cited = [sid for sid in re.findall(r"^\[(s\d+)\]", prompt, flags=re.M)]
+        if set(cited) <= first:
+            return json.dumps([_row(spans[-1].id)]), None
+        return json.dumps([_row(sid) for sid in cited]), None
+
+    report = ExtractionReport()
+    atoms = extract_atoms(spans, client=LLMClient(model="x", transport=elsewhere),
+                          batch_spans=5, report=report)
+    assert {a.span_ids[0] for a in atoms} == {s.id for s in spans[5:]}
+    assert set(report.unusable_span_ids) == first
+    assert set(report.unread_span_ids) == first
+
+
+@pytest.mark.parametrize("bad", [{"span_ids": None}, {"tags": None}, {"span_ids": 7},
+                                 {"tags": 3}])
+def test_a_row_with_a_non_list_field_is_skipped_not_a_crash(bad):
+    spans = segment(DOC)
+
+    def mixed(prompt, system):
+        cited = re.findall(r"^\[(s\d+)\]", prompt, flags=re.M)
+        return json.dumps([_row(sid) for sid in cited] + [_row(cited[0], **bad)]), None
+
+    report = ExtractionReport()
+    atoms = extract_atoms(spans, client=LLMClient(model="x", transport=mixed),
+                          batch_spans=5, report=report)
+    assert len(atoms) >= len(spans)
+    assert not report.unread_span_ids
+
+
+def test_rows_with_only_null_span_ids_are_unusable_not_unparseable():
+    # A null field is a schema miss, not a truncation: the warning must not say
+    # "raise --max-tokens".
+    spans = segment(DOC)
+
+    def nulls(prompt, system):
+        cited = re.findall(r"^\[(s\d+)\]", prompt, flags=re.M)
+        return json.dumps([_row(sid, span_ids=None) for sid in cited]), None
+
+    report = ExtractionReport()
+    with pytest.raises(ExtractionError):
+        extract_atoms(spans, client=LLMClient(model="x", transport=nulls),
+                      batch_spans=5, report=report)
+    assert set(report.unusable_span_ids) == {s.id for s in spans}
+    assert not report.unparseable_span_ids
+
+
+def test_a_bare_string_span_id_is_not_read_character_by_character():
+    spans = segment("Only one setting here.")
+    sid = spans[0].id
+
+    def bare(prompt, system):
+        return json.dumps([_row(sid, span_ids=sid)]), None
+
+    with pytest.raises(ExtractionError):
+        extract_atoms(spans, client=LLMClient(model="x", transport=bare))
