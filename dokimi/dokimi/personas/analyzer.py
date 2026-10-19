@@ -66,8 +66,8 @@ class PersonaAnalyzer:
             Dictionary with analysis results
         """
         # Try PyGithub first, fall back to gh CLI
-        client = self.github_client if GITHUB_AVAILABLE else None
-        if client:
+        client = self.github_client
+        if client is not None:
             return self._analyze_with_pygithub(client, repo_name)
         else:
             logger.info("PyGithub not available, using gh CLI fallback")

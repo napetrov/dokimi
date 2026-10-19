@@ -33,9 +33,13 @@ def _mypy_config() -> dict:
 
 
 def test_no_module_is_exempt_from_mypy():
-    exempt = [
-        o["module"] for o in _mypy_config().get("overrides", []) if o.get("ignore_errors")
-    ]
+    exempt: list[str] = []
+    for override in _mypy_config().get("overrides", []):
+        if override.get("ignore_errors"):
+            module = override["module"]
+            # module can be a string or list of strings in TOML; normalize to list
+            modules = [module] if isinstance(module, str) else module
+            exempt.extend(modules)
     assert not exempt, (
         f"{exempt} exempted from mypy by ignore_errors in pyproject.toml. Every module is "
         "type checked: fix the type errors (run `mypy` from dokimi/) instead."
