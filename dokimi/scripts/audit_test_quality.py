@@ -216,16 +216,39 @@ def _constructor_inputs(nodes: list[ast.AST]) -> dict[str, set[tuple[str, object
     bound: dict[str, set[tuple[str, object, type]]] = {}
     seen: collections.Counter[str] = collections.Counter()
     mutated: set[str] = set()
+
+    def _mark_mutated(node: ast.expr) -> None:
+        """Mark the root name as mutated."""
+        if isinstance(node, ast.Name):
+            mutated.add(node.id)
+        elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+            mutated.add(node.value.id)
+        elif isinstance(node, ast.Tuple):
+            for elt in node.elts:
+                _mark_mutated(elt)
+
     for node in nodes:
-        # Track mutations via method calls or attribute assignments
+        # Track mutations via method calls or setattr
         if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
             call = node.value
             if isinstance(call.func, ast.Attribute) and isinstance(call.func.value, ast.Name):
                 mutated.add(call.func.value.id)
+            elif _call_name(call) == "setattr" and len(call.args) >= 1:
+                _mark_mutated(call.args[0])
+        # Track mutations via attribute assignment
         elif isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name):
                     mutated.add(target.value.id)
+                elif isinstance(target, ast.Tuple):
+                    # Track tuple targets like `c.n, y = 5, 6`
+                    _mark_mutated(target)
+        # Track augmented assignments like `c.n += 1`
+        elif isinstance(node, ast.AugAssign):
+            _mark_mutated(node.target)
+        # Track annotated assignments with mutation like `c.n: int = 5`
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Attribute):
+            _mark_mutated(node.target)
 
         if not isinstance(node, ast.Assign | ast.AnnAssign):
             continue
@@ -282,19 +305,21 @@ def _is_mock_verify(test: ast.expr) -> bool:
     """An assert that only reads whether a mock was called.
 
     ``assert m.call_count == 2 and vote.aggregate == 70.0`` also checks a value,
-    so each operand of an ``and`` is judged on its own.
+    so each operand of an ``and`` is judged on its own. ``or`` is also split.
 
     Tuple comparisons like ``assert (m.call_count, out) == (1, 42)`` check both
     the mock call and the output, so they are not mock-only.
     """
-    if isinstance(test, ast.BoolOp) and isinstance(test.op, ast.And):
+    if isinstance(test, ast.BoolOp) and isinstance(test.op, (ast.And, ast.Or)):
         return all(map(_is_mock_verify, test.values))
-    # If this is a comparison with tuples, check if any element is not a mock attribute
+    # If this is a comparison with tuples, check if all elements are mock attributes
     if isinstance(test, ast.Compare):
         for comp in ast.walk(test):
             if isinstance(comp, ast.Tuple):
-                # A tuple in a comparison likely checks multiple values; not mock-only
-                return False
+                # All tuple elements must be mock attributes
+                for elt in comp.elts:
+                    if not (isinstance(elt, ast.Attribute) and elt.attr in _MOCK_VERIFY_ATTRS):
+                        return False
     return any(isinstance(n, ast.Attribute) and n.attr in _MOCK_VERIFY_ATTRS
                for n in ast.walk(test))
 
@@ -303,7 +328,18 @@ def _is_raises(node: ast.expr) -> bool:
     return isinstance(node, ast.Call) and _call_name(node) in _RAISES_CALLS
 
 
+def _is_bare_call(node: ast.Call) -> bool:
+    """Whether this is a bare function call, not a method call."""
+    return isinstance(node.func, ast.Name)
+
+
 def _has_hint(name: str) -> bool:
+    """A function name that suggests it performs assertions.
+
+    Used to detect asserting helpers by name. Only matches bare function names,
+    not method calls (which don't have dots in _call_name output but are excluded
+    by the asserting_helpers logic).
+    """
     return any(hint in name.lower() for hint in _ASSERTION_HINTS)
 
 
@@ -321,11 +357,16 @@ def _asserting_helpers(tree: ast.Module) -> frozenset[str]:
             defs[node.name].append(node)
 
     def direct(fn: _FuncDef) -> bool:
-        return any(
-            isinstance(n, ast.Assert) or _raises_block(n)
-            or (isinstance(n, ast.Call) and _has_hint(_call_name(n)))
-            for n in _own_nodes(fn.body)
-        )
+        for n in _own_nodes(fn.body):
+            if isinstance(n, ast.Assert) or _raises_block(n):
+                return True
+            # Check for calls with hints, but only bare function calls (in helpers)
+            if isinstance(n, ast.Call) and _has_hint(_call_name(n)):
+                # Only count it if it's a bare name (will be in defs), not a method
+                call_name = _call_name(n)
+                if "." not in call_name and call_name in defs:
+                    return True
+        return False
 
     def callees(fn: _FuncDef) -> set[str]:
         return {_call_name(n) for n in _own_nodes(fn.body) if isinstance(n, ast.Call)}
@@ -390,7 +431,11 @@ def _shape_flags(fn: _FuncDef, names: frozenset[str], helpers: frozenset[str]) -
         "set_then_read": _all_value_asserts(t, lambda e: _echoes_input(e, inputs)),
         "constant_mirror": _all_value_asserts(t, lambda e: _is_constant_mirror(e, names)),
         "no_assert": not checks and not any(
-            _has_hint(_call_name(c)) or _call_name(c) in helpers for c in t.calls
+            (_call_name(c) in helpers or
+             # Only explicit pytest methods or bare function names with hints, not method calls
+             _call_name(c).startswith(("pytest.fail", "pytest.raises", "pytest.warns", "assert")) or
+             (_has_hint(_call_name(c)) and _is_bare_call(c)))
+            for c in t.calls
         ),
     }
     found = {flag for flag, hit in flags.items() if hit}
