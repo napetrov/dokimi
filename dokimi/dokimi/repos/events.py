@@ -78,6 +78,19 @@ def convert(fmt: str, raw: str, workdir: str | None = None) -> Transcript:
     raise ValueError(f"unknown trace format {fmt!r} (known: {', '.join(TRACE_FORMATS)})")
 
 
+def _token_counts(rec: dict) -> tuple[str, tuple[int, int, int, int]] | None:
+    """Extract token counts from a result record.
+
+    Returns None when usage is absent or empty (no measurement).
+    Raises TypeError if usage is present but not a dict (malformed input).
+    """
+    from dokimi.harnesses.claude_json import token_counts
+    usage = rec.get("usage")
+    if usage is not None and not isinstance(usage, dict):
+        raise TypeError(f"usage is not an object: {type(usage).__name__}")
+    return token_counts(rec)
+
+
 def _claude_stream_json(raw: str, workdir: str | None) -> Transcript:
     out = Transcript()
     start: datetime | None = None
@@ -148,10 +161,7 @@ def _apply(out: Transcript, rec: dict[str, Any], t: float | None,
         out.num_turns = rec.get("num_turns")
         out.is_error = bool(rec.get("is_error"))
         out.result_subtype = rec.get("subtype")
-        if not isinstance(rec.get("usage") or {}, dict):
-            raise TypeError("usage is not an object")
-        from dokimi.harnesses.claude_json import token_counts
-        counts = token_counts(rec)
+        counts = _token_counts(rec)
         if counts is not None:
             out.usage_scope, (out.input_tokens, out.output_tokens, out.cache_read_tokens,
                               out.cache_write_tokens) = counts
