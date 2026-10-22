@@ -225,7 +225,8 @@ def register(sub, positive_int) -> None:
         "--strict",
         action="store_true",
         help="Exit 1 on a skill spec error (name not the directory name or not kebab-case, "
-        "description over 1024 characters) as well as on a skill that does not load",
+        "description over 1024 characters, a relative link to a missing file) as well as on a "
+        "skill that does not load",
     )
     scan_p.add_argument(
         "--format",

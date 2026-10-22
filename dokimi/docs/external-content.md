@@ -120,6 +120,18 @@ an earlier skill's, is a `warn` that names the first copy; warnings never change
 the exit code. `disable-model-invocation: true` is printed as a `note`, because
 the model is never offered that skill.
 
+The scan also checks the bundle and the description. A relative Markdown link
+to a file the skill does not have is an `error` (`link-missing`). A link, or a
+`../` code span, that reaches a file outside the skill directory is a `warn`
+(`link-escapes-skill`, `path-escapes-skill`), since it breaks when the skill is
+installed alone. A description with no "when to use" clause is a `warn`
+(`description-no-when`), and so is one that overlaps another skill's by a
+Jaccard similarity of 0.5 or more (`description-near-duplicate`). Two copies of a
+skill in different paths whose `SKILL.md` differs are a `warn` on both
+(`mirror-drift`). Skills with `disable-model-invocation: true` are not checked
+for the description. Links in code fences, URLs, anchors and code spans that name
+no file are not checked.
+
 Frontmatter that is not valid YAML (a bare colon in `description:`, say) stops
 the skill from loading, since the loader reads it as having no description. The
 scan reports that as a `frontmatter-parse` error carrying the YAML message, and
