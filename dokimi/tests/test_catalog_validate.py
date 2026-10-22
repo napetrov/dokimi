@@ -240,7 +240,7 @@ def _codes(review) -> list[str]:
     return [f.code for f in review.findings]
 
 
-def test_relative_link_to_a_file_that_is_not_there_is_an_error(tmp_path):
+def test_relative_link_to_a_file_that_is_not_there_is_a_warning(tmp_path):
     _skill(tmp_path / "skills", "guided", name="guided", description="Use for guided work.",
            body="See [the guide](references/guide.md).\n")
     bundled = _skill(
@@ -254,7 +254,7 @@ def test_relative_link_to_a_file_that_is_not_there_is_an_error(tmp_path):
     (bundled / "references" / "guide.md").write_text("# G\n", encoding="utf-8")
 
     reviews = _reviews_by_name(tmp_path)
-    assert reviews["guided"].state == "error"
+    assert reviews["guided"].state == "warn"
     assert _codes(reviews["guided"]) == ["link-missing"]
     assert reviews["bundled"].state == "ok"
 
@@ -265,7 +265,7 @@ def test_link_that_exists_from_the_catalog_root_says_the_base_is_wrong(tmp_path)
     _skill(tmp_path / "skills", "runner", name="runner", body="Run [it](scripts/run.py).\n")
 
     [review] = review_skills(read_skill_manifest(tmp_path))
-    assert review.state == "error"
+    assert review.state == "warn"
     [finding] = review.findings
     assert finding.code == "link-missing"
     assert "the base is wrong" in finding.message
@@ -309,11 +309,11 @@ def test_link_out_of_the_skill_dir_to_an_existing_file_is_a_warning(tmp_path):
     assert _codes(review) == ["link-escapes-skill"]
 
 
-def test_link_out_of_the_skill_dir_to_a_missing_file_is_an_error(tmp_path):
+def test_link_out_of_the_skill_dir_to_a_missing_file_is_a_warning(tmp_path):
     _skill(tmp_path / "skills", "reach", name="reach", body="See [notes](../../nowhere.md).\n")
 
     [review] = review_skills(read_skill_manifest(tmp_path))
-    assert review.state == "error"
+    assert review.state == "warn"
     assert _codes(review) == ["link-missing"]
 
 
@@ -399,7 +399,7 @@ def test_identical_copies_are_a_duplicate_and_not_drift(tmp_path):
     assert all("mirror-drift" not in _codes(r) for r in reviews)
 
 
-def test_new_warnings_do_not_fail_the_scan_but_a_missing_link_does_under_strict(tmp_path, capsys):
+def test_new_warnings_do_not_fail_the_scan_even_under_strict(tmp_path, capsys):
     (tmp_path / "shared").mkdir()
     (tmp_path / "shared" / "notes.md").write_text("# Notes\n", encoding="utf-8")
     _skill(tmp_path / "skills", "reach", name="reach", description="Builds reports.",
@@ -410,8 +410,9 @@ def test_new_warnings_do_not_fail_the_scan_but_a_missing_link_does_under_strict(
     assert {f["code"] for f in report["skills"][0]["findings"]} == {
         "description-no-when", "link-escapes-skill"}
 
-    _skill(tmp_path / "skills", "broken", name="broken", body="See [gone](gone.md).\n")
+    _skill(tmp_path / "skills", "example", name="example", description="Builds reports.",
+           body="Format: [Title](URL)\n")
     report, code = _scan_json(tmp_path, capsys, strict=True)
-    assert code == 1
+    assert code == 0
     states = {row["name"]: row["state"] for row in report["skills"]}
-    assert states == {"reach": "warn", "broken": "error"}
+    assert states == {"reach": "warn", "example": "warn"}

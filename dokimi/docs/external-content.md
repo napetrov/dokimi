@@ -121,8 +121,10 @@ the exit code. `disable-model-invocation: true` is printed as a `note`, because
 the model is never offered that skill.
 
 The scan also checks the bundle and the description. A relative Markdown link
-to a file the skill does not have is an `error` (`link-missing`). A link, or a
-`../` code span, that reaches a file outside the skill directory is a `warn`
+to a file the skill does not have is a `warn` (`link-missing`), and says when the
+file exists from the catalog root instead. Example links such as `[Title](URL)`
+are common, so `--strict` does not fail on them. A link, or a `../` code span,
+that reaches a file outside the skill directory is a `warn`
 (`link-escapes-skill`, `path-escapes-skill`), since it breaks when the skill is
 installed alone. A description with no "when to use" clause is a `warn`
 (`description-no-when`), and so is one that overlaps another skill's by a

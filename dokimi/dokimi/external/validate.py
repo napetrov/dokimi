@@ -29,9 +29,10 @@ counting them twice inflates routing and coverage numbers.
 that skill, so it is reported as a flag (the same reading as the skill arm's
 check in :mod:`dokimi.harnesses.skill_treatment`).
 
-Bundle links: a relative Markdown link in ``SKILL.md`` whose file does not exist is an
-``error`` (``link-missing``), with a note when the file exists from the catalog root
-instead (a wrong base). A link to a file outside the skill directory is a ``warn``
+Bundle links: a relative Markdown link in ``SKILL.md`` whose file does not exist is a
+``warn`` (``link-missing``), with a note when the file exists from the catalog root
+instead (a wrong base). Example links such as ``[Title](URL)`` are common, so this is not
+an error and does not fail ``--strict``. A link to a file outside the skill directory is a ``warn``
 (``link-escapes-skill``): it breaks when the skill is installed alone. A ``../`` code span
 naming such a file is ``path-escapes-skill``. Code spans that name no file are not checked,
 and neither are code fences: those are usually examples or paths in the user's own project.
@@ -261,7 +262,7 @@ def _bundle_findings(skill: Skill, source_root: Path) -> list[Finding]:
             from_root = " (it exists from the catalog root: the base is wrong)"
         findings.append(
             Finding(
-                "error",
+                "warn",
                 "link-missing",
                 f"link {raw!r} names no file relative to the skill directory{from_root}",
             )

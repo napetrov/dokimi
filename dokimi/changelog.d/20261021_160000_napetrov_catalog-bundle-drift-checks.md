@@ -1,7 +1,7 @@
 ### Added
 
 - **`catalog scan` checks each skill's bundle and description, and detects drifted mirrors** —
-  a relative Markdown link in `SKILL.md` to a file that does not exist is an `error`
+  a relative Markdown link in `SKILL.md` to a file that does not exist is a `warn`
   (`link-missing`), and says so when the file exists from the catalog root instead (a wrong
   base). A link or `../` code span that reaches a file outside the skill directory is a `warn`
   (`link-escapes-skill`, `path-escapes-skill`): it breaks when the skill is installed alone.
