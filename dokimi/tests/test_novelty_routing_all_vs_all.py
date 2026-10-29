@@ -271,6 +271,13 @@ def test_two_identical_cards_are_one_tied_group_and_no_attractor(order):
     assert result["lexical"]["attractors"] == []
 
 
+def test_cards_with_the_same_description_words_in_another_order_are_one_tied_group():
+    field = [Candidate(name="a", description="format json output"),
+             Candidate(name="b", description="output json format")]
+    result = all_vs_all(field, {"a": ["format json"], "b": ["format json"]})
+    assert result["tied_groups"] == [["a", "b"]]
+
+
 def test_an_attractor_outside_the_tied_group_is_still_reported():
     field = [Candidate(name="a", description="format json output"),
              Candidate(name="b", description="format json output"),
