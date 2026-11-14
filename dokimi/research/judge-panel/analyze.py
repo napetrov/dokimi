@@ -9,6 +9,7 @@ Writes OUT/summary.json and CSV tables in OUT/tables/. Pure stdlib + numpy.
 from __future__ import annotations
 
 import csv
+import hashlib
 import itertools
 import json
 import random
@@ -72,9 +73,17 @@ V = defaultdict(dict)  # key -> judge -> verdict
 for k, r in rows.items():
     if r.get("verdict") in SCORE:
         V[k][ORIG] = r["verdict"]
+
+def answer_sha(r):
+    """Fingerprint of a row's answer, as judge_panel.py stamps the grades it makes on it."""
+    return hashlib.sha256((r.get("answer") or "").encode()).hexdigest()[:16]
+
+
 for l in (OUT / "grades.jsonl").read_text().splitlines():
     g = json.loads(l)
-    if g.get("verdict") in SCORE and g["key"] in rows and (g["judge"] in FAM or not PANEL_ONLY):
+    # A grade made on an answer the row no longer holds (its regrade failed) is not this row's.
+    current = g["key"] in rows and g.get("answer_sha") in (None, answer_sha(rows[g["key"]]))
+    if g.get("verdict") in SCORE and current and (g["judge"] in FAM or not PANEL_ONLY):
         V[g["key"]][g["judge"]] = g["verdict"]
 JUDGES = [ORIG] + sorted({j for d in V.values() for j in d} - {ORIG})
 NEW = [j for j in JUDGES if j != ORIG]
@@ -199,7 +208,13 @@ summary["gated_rank_by_judge"] = rank
 
 
 # ---------- 2. pairwise agreement ----------
+def rounded(x, nd=3):
+    """``x`` rounded, or an empty cell when the statistic is undefined."""
+    return "" if x is None else round(x, nd)
+
+
 def kappa(a, b, labels):
+    """Cohen's kappa, or None when the judges share no row."""
     n = len(a)
     if n == 0:
         return None
@@ -223,21 +238,25 @@ for j1, j2 in itertools.combinations(JUDGES, 2):
         j1,
         j2,
         len(ks),
-        round(kappa(a6, b6, V6), 3),
-        round(kappa(al, bl, [True, False]), 3),
-        round(kappa(as_, bs, [True, False]), 3),
-        round(sum(x == y for x, y in zip(al, bl, strict=True)) / len(ks), 3),
+        rounded(kappa(a6, b6, V6)),
+        rounded(kappa(al, bl, [True, False])),
+        rounded(kappa(as_, bs, [True, False])),
+        rounded(sum(x == y for x, y in zip(al, bl, strict=True)) / len(ks)) if ks else "",
     ]
-    kap[(j1, j2)] = kap[(j2, j1)] = r[4]
+    kap[(j1, j2)] = kap[(j2, j1)] = kappa(al, bl, [True, False])
     kt.append(r)
 wcsv(
     "pairwise_kappa.csv",
     ["judge_a", "judge_b", "n", "kappa_6way", "kappa_lenient", "kappa_strict", "agree_lenient"],
     kt,
 )
-summary["mean_kappa_lenient"] = {
-    j: round(float(np.mean([kap[(j, o)] for o in JUDGES if o != j])), 3) for j in JUDGES
-}
+def mean_kappa(j):
+    """The mean lenient kappa of ``j`` against the other judges, over the pairs it is defined on."""
+    vals = [kap[(j, o)] for o in JUDGES if o != j and kap[(j, o)] is not None]
+    return rounded(float(np.mean(vals))) if vals else None
+
+
+summary["mean_kappa_lenient"] = {j: mean_kappa(j) for j in JUDGES}
 
 # leniency of each judge: overall lenient / strict rate
 summary["judge_rates"] = {

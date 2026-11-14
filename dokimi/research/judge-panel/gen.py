@@ -77,8 +77,10 @@ def panel_get(panel, good):
     return get
 
 
-def jget(j, good):
-    return lambda k: (V[k][j] in good) if j in V[k] else None
+def jget(j, good, also=()):
+    """``j``'s correctness per grade, None where it has no grade or one of ``also`` has none: a
+    cell counts only when every judge in the comparison graded every arm, so both shares share one sample."""
+    return lambda k: (V[k][j] in good) if j in V[k] and all(a in V[k] for a in also) else None
 
 
 out = {"judges": ALL, "per_judge": {}, "pairs": [], "panels": {}}
@@ -97,10 +99,11 @@ for fam, old, new in PAIRS:
            "added": {}}
     for mode, good in (("lenient", LEN), ("strict", STR)):
         for m in MODELS:
-            ho, hn = headline(jget(old, good), m, good), headline(jget(new, good), m, good)
+            ho = headline(jget(old, good, (new,)), m, good)
+            hn = headline(jget(new, good, (old,)), m, good)
             d = None if ho["added"] is None or hn["added"] is None else hn["added"] - ho["added"]
             row["added"][f"{mode}:{m}"] = [ho["added"], hn["added"]]
-            tab.append([fam, old, new, mode, m, round(ho["added"], 3), round(hn["added"], 3),
+            tab.append([fam, old, new, mode, m, rounded(ho["added"]), rounded(hn["added"]),
                         round(d, 3) if d is not None else ""])
     out["pairs"].append(row)
     ktab.append([fam, old, new, n, rounded(k), row["lenient_rate_delta"]])
@@ -125,7 +128,7 @@ for name, panel in (("old", OLD_PANEL), ("new", NEW_PANEL)):
         for m in MODELS:
             h = headline(panel_get(panel, good), m, good)
             out["panels"][name]["added"][f"{mode}:{m}"] = h["added"]
-            tab.append([name, "+".join(panel), mode, m, h["n"], round(h["added"], 3)])
+            tab.append([name, "+".join(panel), mode, m, h["n"], rounded(h["added"])])
 wcsv("generation_panels.csv", ["panel", "judges", "mode", "answer_model", "n", "added"], tab)
 (OUT / "gen_summary.json").write_text(json.dumps(out, indent=1))
 
@@ -134,11 +137,15 @@ for j in ALL:
     p = out["per_judge"][j]
     print(f"  {j:24s} {p['lenient_rate']:.3f} {p['strict_rate']:.3f} {p['mean_kappa_vs_others'] or float('nan'):.3f}")
 print("pairs (kappa old-new, lenient-rate delta, lenient added old->new per answer model)")
+def shown(x):
+    return "nan" if x is None else f"{x:.2f}"
+
+
 for r in out["pairs"]:
-    adds = " ".join(f"{k.split(':')[1][:10]}={v[0]:.2f}->{v[1]:.2f}" for k, v in r["added"].items()
-                    if k.startswith("lenient"))
+    adds = " ".join(f"{k.split(':')[1][:10]}={shown(v[0])}->{shown(v[1])}"
+                    for k, v in r["added"].items() if k.startswith("lenient"))
     print(f"  {r['old']}->{r['new']}: k={r['kappa_old_new']} dlen={r['lenient_rate_delta'] or float('nan'):+.3f} {adds}")
 print("panels median, lenient added")
 for name, p in out["panels"].items():
-    print(" ", name, {k.split(':')[1]: round(v, 3) for k, v in p["added"].items() if k.startswith("lenient")})
-    print(" ", name, "strict", {k.split(':')[1]: round(v, 3) for k, v in p["added"].items() if k.startswith("strict")})
+    print(" ", name, {k.split(':')[1]: rounded(v) for k, v in p["added"].items() if k.startswith("lenient")})
+    print(" ", name, "strict", {k.split(':')[1]: rounded(v) for k, v in p["added"].items() if k.startswith("strict")})
