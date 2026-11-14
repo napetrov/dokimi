@@ -154,7 +154,9 @@ The contract:
   `0` (or `0.0`) for fail. A fraction such as `0.75` (partial credit) is kept
   as the cell's reward and counts as a fail. The harness copies that file out.
   Without it the exit code is no pass: exit 0 errors the cell and a non-zero
-  exit scores 0. A file with no number in it (`PASS`, empty) errors the cell.
+  exit scores 0. This is the rule for this format; a terminal-bench v1 task
+  (`task.yaml`) is still graded by its pytest summary. A file with no number
+  in it (`PASS`, empty) errors the cell.
 - Do not let a failure abort before the reward file is written (capture the
   pytest exit code, write the file, then exit with it).
 
