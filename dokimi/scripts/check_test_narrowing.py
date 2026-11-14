@@ -60,6 +60,8 @@ IGNORES = re.compile(r"collect_ignore(_glob)?|pytest_ignore_collect")
 BROAD = {"Exception", "BaseException"}
 # What a tolerance is when its keyword is left out of pytest.approx or math.isclose.
 DEFAULTS = {"rel": 1e-6, "abs": 1e-12, "rtol": 1e-5, "atol": 1e-8, "rel_tol": 1e-9, "abs_tol": 0.0}
+# Defaults that differ from DEFAULTS: numpy.testing.assert_allclose is not numpy.allclose.
+API_DEFAULTS = {"assert_allclose": {"rtol": 1e-7, "atol": 0.0}}
 
 
 def _git(*args: str) -> subprocess.CompletedProcess[str]:
@@ -101,6 +103,7 @@ class Shape:
     cases: int | None = None
     cases_known: bool = True
     body: str = ""
+    source: str = ""
 
 
 def _name(func: ast.expr) -> str:
@@ -124,10 +127,11 @@ def _read_raises(call: ast.Call, shape: Shape) -> None:
 
 
 def _skip_weight(call: ast.Call) -> int:
-    """0 for a skip condition that is the constant that never skips, else 1."""
+    """0 for a skip or xfail condition that is the constant that never skips, else 1."""
     name = _name(call.func)
     condition = call.args[0] if call.args else {k.arg: k.value for k in call.keywords}.get("condition")
-    if name in {"skipif", "skipIf", "skipUnless"} and isinstance(condition, ast.Constant):
+    marked = name != "xfail" or _is_mark(call.func)
+    if name in {"skipif", "skipIf", "skipUnless", "xfail"} and marked and isinstance(condition, ast.Constant):
         return int(bool(condition.value) == (name != "skipUnless"))
     return 1
 
@@ -155,21 +159,49 @@ def _skips_in(node: ast.AST) -> int:
     return total
 
 
-def _read_tolerances(call: ast.Call, shape: Shape) -> None:
+class _StripTolerances(ast.NodeTransformer):
+    def visit_Call(self, node: ast.Call) -> ast.Call:
+        self.generic_visit(node)
+        node.keywords = [kw for kw in node.keywords if kw.arg not in TOLERANCES]
+        return node
+
+
+def _assert_contexts(stmt: ast.stmt) -> dict[int, str]:
+    """For each call inside an ``assert`` under ``stmt``: the assert's test without its tolerances,
+    so that two comparisons that differ only by their operands are told apart."""
+    found: dict[int, str] = {}
+    for sub in ast.walk(stmt):
+        if isinstance(sub, ast.Assert):
+            text = ast.dump(_StripTolerances().visit(copy.deepcopy(sub.test)))
+            found.update({id(call): text for call in ast.walk(sub.test)
+                          if isinstance(call, ast.Call) and id(call) not in found})
+    return found
+
+
+def _read_tolerances(call: ast.Call, shape: Shape, context: str | None = None) -> None:
     """Record ``call`` with its tolerances when it is a comparison that takes them."""
     named = [kw for kw in call.keywords if kw.arg in TOLERANCES]
-    if not named and _name(call.func) not in TOLERANT:
+    api = _name(call.func)
+    if not named and api not in TOLERANT:
         return
+    given = {kw.arg for kw in named if isinstance(kw.value, ast.Constant) and kw.value.value is not None}
     tolerances: dict[str, float] = {}
     for kw in named:
         value = kw.value.value if isinstance(kw.value, ast.Constant) else ""
-        if value is None or isinstance(value, (int, float)):
+        if value is None and api == "approx":
+            # pytest.approx: rel=None is unset; with abs given the tolerance is abs alone, so rel is 0.
+            if kw.arg == "rel" and "abs" in given:
+                tolerances["rel"] = 0.0
+        elif value is None or isinstance(value, (int, float)):
             tolerances[str(kw.arg)] = math.inf if value is None else float(value)
+    for kind, default in API_DEFAULTS.get(api, {}).items():
+        tolerances.setdefault(kind, default)
     others = [kw for kw in call.keywords if kw not in named]
-    shape.tolerances.append((ast.dump(ast.Call(call.func, call.args, others)), tolerances))
+    key = context if context is not None else ast.dump(ast.Call(call.func, call.args, others))
+    shape.tolerances.append((key, tolerances))
 
 
-def _read_call(call: ast.Call, shape: Shape) -> None:
+def _read_call(call: ast.Call, shape: Shape, context: str | None = None) -> None:
     name = _name(call.func)
     if name in RAISES:
         shape.checks += 1
@@ -178,7 +210,7 @@ def _read_call(call: ast.Call, shape: Shape) -> None:
         shape.checks += 1
     elif name in SKIPS:
         shape.skips += _skip_weight(call)
-    _read_tolerances(call, shape)
+    _read_tolerances(call, shape, context)
 
 
 def _cases(decorator: ast.expr) -> tuple[bool, int | None]:
@@ -208,11 +240,12 @@ def shape_of(node: ast.FunctionDef | ast.AsyncFunctionDef) -> Shape:
             if isinstance(sub, ast.Call):
                 _read_tolerances(sub, shape)
     for stmt in node.body:
+        contexts = _assert_contexts(stmt)
         for sub in ast.walk(stmt):
             if isinstance(sub, ast.Assert):
                 shape.checks += 1
             elif isinstance(sub, ast.Call):
-                _read_call(sub, shape)
+                _read_call(sub, shape, contexts.get(id(sub)))
     return shape
 
 
@@ -306,6 +339,8 @@ def tests_in(text: str) -> dict[str, Shape] | None:
                 if _is_test(item):
                     shape = found[f"{node.name}.{item.name}"] = shape_of(item)
                     shape.skips += class_skips
+    for shape in found.values():
+        shape.source = text
     return found
 
 
@@ -397,7 +432,10 @@ def compare(base_text: str, head_text: str | None,
             twins = moved.get(shape.body)
             if not twins:
                 found.append((name, 0, "removed"))
-            elif reasons := narrowing(shape, twins.pop(0)):
+                continue
+            twin = twins.pop(0)
+            reasons = narrowing(shape, twin)
+            if reasons and not _waived_inline(twin.source, twin, base_text, shape):
                 found.append((name, 0, "moved, and " + "; ".join(reasons)))
             continue
         reasons = narrowing(shape, now)

@@ -466,3 +466,44 @@ def test_a_commit_waiver_on_a_merge_covers_its_files(tmp_path, monkeypatch):
     _git(tmp_path, "merge", "-q", "--no-ff", "side", "-m", "merge\n\nTest-narrowed: gone")
     monkeypatch.setattr(ctn, "REPO", tmp_path)
     assert "tests/test_c.py" in ctn.waivers("base", "HEAD")
+
+
+@pytest.mark.parametrize("mark", ["xfail(False, reason='later')", "xfail(condition=False, reason='later')"])
+def test_an_xfail_mark_turned_on_is_a_skip(mark):
+    base = BASE.replace("def test_close():", f"@pytest.mark.{mark}\ndef test_close():")
+    assert [what for _, _, what in ctn.compare(base, base.replace("False", "True"))] == ["adds a skip or xfail"]
+
+
+def test_dropping_rel_from_an_abs_only_approx_is_not_a_loosening():
+    base = BASE.replace("rel=1e-9)", "rel=1e-9, abs=1e-12)")
+    head = base.replace("rel=1e-9,", "rel=None,")
+    assert ctn.compare(base, head) == []
+    assert [what for _, _, what in ctn.compare(head, base)] == ["loosens a tolerance"]
+
+
+def test_swapped_tolerances_of_two_lookalike_comparisons_are_named():
+    f_check = "    assert f() == pytest.approx(1, rel=1e-9)\n"
+    g_check = "    assert g() == pytest.approx(1, rel=1e-3)\n"
+    base = "import pytest\n\n\ndef test_a():\n" + f_check + g_check
+    swapped = base.replace(f_check, "    assert f() == pytest.approx(1, rel=1e-3)\n").replace(
+        g_check, "    assert g() == pytest.approx(1, rel=1e-9)\n")
+    assert [what for _, _, what in ctn.compare(base, swapped)] == ["loosens a tolerance"]
+    assert ctn.compare(base, base.replace(f_check + g_check, g_check + f_check)) == []
+
+
+def test_assert_allclose_tightened_from_its_own_default_is_not_a_loosening():
+    base = "import numpy.testing as npt\n\n\ndef test_a(a, b):\n    npt.assert_allclose(a, b, rtol=1e-6)\n"
+    assert ctn.compare(base, base.replace(", rtol=1e-6", "")) == []
+    loosened = base.replace(", rtol=1e-6", "")
+    assert [what for _, _, what in ctn.compare(loosened, base)] == ["loosens a tolerance"]
+
+
+def test_a_moved_test_with_an_inline_waiver_at_its_destination_is_waived():
+    moved = "import pytest\npytestmark = pytest.mark.skip\n\n\ndef test_close():\n    %s\n    assert 0.1 + 0.2 == pytest.approx(0.3, rel=1e-9)\n"
+    base_shape = ctn.tests_in(BASE)["test_close"]
+    head = BASE.replace("def test_close", "def helper_close")
+    waived = ctn.tests_in(moved % "# Test-narrowed: covered elsewhere")["test_close"]
+    assert ctn.compare(BASE, head, {base_shape.body: [waived]}) == []
+    unwaived = ctn.tests_in(moved % "# reworded")["test_close"]
+    assert [what for _, _, what in ctn.compare(BASE, head, {base_shape.body: [unwaived]})] == [
+        "moved, and adds a skip or xfail"]
