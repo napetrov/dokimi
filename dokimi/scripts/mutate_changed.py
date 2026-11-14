@@ -20,9 +20,9 @@ breaking. Steps:
    At most ``--max-mutants``, spread round-robin over the changed lines.
 5. Each mutant runs the tests covering its line, ``-x``, in a copy of the
    tracked tree (subprocess tests see the mutant too; the checkout is never
-   written). Exit 0 from pytest is a survivor, exit 1 (a test failed) a kill;
-   a timeout and any other exit code (no test ran, a usage error) get their own
-   status, never a kill.
+   written). Exit 0 from pytest is a survivor, exit 1 (a test failed) a kill, and
+   so is a collection error the mutant caused (``_mutant_status``); a timeout and
+   any other exit code (no test ran, a usage error) get their own status, never a kill.
 
 A line no candidate test executes is reported as uncovered, not mutated: the
 changed-lines coverage gate in ``ci.yml`` owns that. The run stops starting
@@ -89,13 +89,13 @@ def changed_lines(base: str) -> dict[str, set[int]]:
     """
     mb = subprocess.run(["git", "merge-base", base, "HEAD"], cwd=REPO, capture_output=True, text=True, encoding="utf-8")
     if mb.returncode:
-        raise SystemExit(f"git diff {base}...HEAD failed: {mb.stderr.strip()}")
+        raise SystemExit(f"git merge-base {base} HEAD failed: {mb.stderr.strip()}")
     out = subprocess.run(
         ["git", "diff", "-U0", "--no-color", "--diff-filter=AMR", mb.stdout.strip(), "--", f"{PKG}*.py"],
         cwd=REPO, capture_output=True, text=True, encoding="utf-8",
     )
     if out.returncode:
-        raise SystemExit(f"git diff {base}...HEAD failed: {out.stderr.strip()}")
+        raise SystemExit(f"git diff {mb.stdout.strip()} failed: {out.stderr.strip()}")
     result: dict[str, set[int]] = {}
     path = None
     for line in out.stdout.splitlines():
@@ -262,6 +262,20 @@ def _pytest(
 
 
 _SUMMARY = re.compile(r"^(?:FAILED|ERROR) (.+?)(?: - .*)?$", re.MULTILINE)
+_PASSED = re.compile(r"\b[1-9]\d* passed\b")  # the final pytest line of a run in which a test ran
+_COLLECTION_ERROR = "ERROR collecting "  # a module that does not import: the mutant broke it (pytest's exit code for this varies)
+
+
+def _mutant_status(rc: int, log: str) -> str:
+    """1 is a failed test. A collection error (exit 2 or 4 by pytest version) is one too: the file collected unmutated,
+    so the mutant broke the import. Other exits (internal, usage, nothing collected) say nothing about the mutant."""
+    if rc == 0:
+        return "survived"
+    if rc == -1:
+        return "timeout"
+    if rc == 1 or (rc in (2, 4) and _COLLECTION_ERROR in log):
+        return "killed"
+    return "error"
 
 
 def covering_tests(
@@ -297,6 +311,7 @@ def covering_tests(
             continue
         bad = set(_SUMMARY.findall(log)) if rc == 1 else set()
         failing += sorted(bad)
+        ran = _PASSED.search(log) is not None
         data = coverage.CoverageData(basename=str(data_file))
         data.read()
         measured = {Path(f).resolve(): f for f in data.measured_files()}
@@ -307,7 +322,7 @@ def covering_tests(
             lines = by_file.setdefault(rel, {})
             for ln, cs in data.contexts_by_lineno(f).items():
                 ids = {c.rsplit("|", 1)[0] for c in cs if c}
-                if "" in cs and not bad:  # run at collection (an import-time constant or default): the file's tests run it
+                if "" in cs and not bad and ran:  # run at collection (an import-time constant or default): the file's tests run it
                     ids.add(test)
                 if ids := ids - bad:
                     lines[ln] = sorted(set(lines.get(ln, [])) | ids)
@@ -361,12 +376,11 @@ def run(args: argparse.Namespace) -> int:
             _write_source(target, apply(original, m))
             start = time.monotonic()
             try:
-                rc, _ = _pytest(work / "dokimi", ["-x", "-p", "no:xdist", f"@{tests_file}"], args.mutant_timeout)
+                rc, log = _pytest(work / "dokimi", ["-x", "-p", "no:xdist", f"@{tests_file}"], args.mutant_timeout)
             finally:
                 _write_source(target, original)
             m.seconds = round(time.monotonic() - start, 1)
-            # 1 is a failed test. 2-5 (interrupted, internal, usage, nothing collected) say nothing about the mutant.
-            m.status = "survived" if rc == 0 else "timeout" if rc == -1 else "killed" if rc == 1 else "error"
+            m.status = _mutant_status(rc, log)
         report["mutants"] = [asdict(m) for m in chosen]
     report["uncovered_lines"] = {p: sorted(s) for p, s in report["uncovered_lines"].items()}
     survived = sum(m.status == "survived" for m in chosen)

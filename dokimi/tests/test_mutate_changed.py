@@ -114,7 +114,7 @@ def test_changed_lines_reads_added_and_edited_lines(tmp_path: Path, monkeypatch:
     _git(tmp_path, "commit", "-qam", "head")
     monkeypatch.setattr(mc, "REPO", tmp_path)
     assert mc.changed_lines("HEAD~1") == {"dokimi/dokimi/m.py": {2, 4}}
-    with pytest.raises(SystemExit, match="git diff"):
+    with pytest.raises(SystemExit, match="git merge-base"):
         mc.changed_lines("no-such-ref")
 
 
@@ -367,3 +367,43 @@ def test_a_survivor_is_a_warning_unless_fail_on_survivor(tmp_path: Path, monkeyp
 def test_no_mutable_changed_line_exits_clean(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(mc, "changed_lines", lambda base: {})
     assert mc.main(["--base", "HEAD", "--fail-on-survivor"]) == 0
+
+
+def test_a_mutant_that_breaks_the_import_is_killed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    src = "ITEMS = [0, 1]\nFIRST = ITEMS[1]\n\n\ndef a(x):\n    return x == 1\n"
+    tests = "from dokimi.zz import a\n\n\ndef test_a():\n    assert a(1) is True\n"
+    _, report = _mutation_run(tmp_path, monkeypatch, src, tests, {2: ["tests/test_zz.py::test_a"]})
+    assert report["mutants"] and {m["status"] for m in report["mutants"]} == {"killed"}
+
+
+@pytest.mark.parametrize("summary, attributed", [("1 skipped in 0.01s", False), ("1 passed in 0.01s", True)])
+def test_an_import_time_line_is_attributed_only_when_a_test_ran(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, summary: str, attributed: bool
+) -> None:
+    zz = tmp_path / "dokimi" / "dokimi" / "zz.py"
+    zz.parent.mkdir(parents=True)
+    contexts = {1: {""}, 4: {"tests/test_zz.py::test_a|run"}}
+
+    class Data:
+        def __init__(self, basename: str) -> None:
+            pass
+
+        def read(self) -> None:
+            pass
+
+        def measured_files(self) -> list[str]:
+            return [str(zz)]
+
+        def contexts_by_lineno(self, f: str) -> dict[int, set[str]]:
+            return contexts
+
+    def pytest_run(cwd: Path, args: list[str], timeout: float, env: dict[str, str] | None = None) -> tuple[int, str]:
+        (cwd / ".coverage").write_text("", encoding="utf-8")
+        return 0, f"=== {summary} ==="
+
+    monkeypatch.setitem(sys.modules, "coverage", types.SimpleNamespace(CoverageData=Data))
+    monkeypatch.setattr(mc, "_pytest", pytest_run)
+    by_file, failing, not_run = mc.covering_tests(tmp_path, ["tests/test_zz.py"], ["dokimi/dokimi/zz.py"], 60)
+    assert (failing, not_run) == ([], [])
+    expected = {1: ["tests/test_zz.py"], 4: ["tests/test_zz.py::test_a"]} if attributed else {4: ["tests/test_zz.py::test_a"]}
+    assert by_file == {"dokimi/dokimi/zz.py": expected}
