@@ -57,11 +57,11 @@ Probe judge validity with degraded answers and examine agreement, order and word
 
 **Availability:** Open PR.
 
-The proposed identifier checks compare an answer with tool evidence such as help text, while retaining the judge as a separate signal. Broader execution and source checks remain proposals.
+The identifier checks compare an answer with tool evidence such as help text, while retaining the judge as a separate signal. Broader execution and source checks remain proposals.
 
-**Input:** Novelty probes, claimed identifiers and tool-help/reference evidence for the proposed grounding checks.
+**Input:** Novelty probes, claimed identifiers and tool-help/reference evidence for the grounding checks.
 
-**Scope and limits:** PR [#472](https://github.com/intel/dokimi/pull/472): identifier checks; exec/source grading remain proposed.
+**Scope and limits:** Identifier checks are on main (`commands/novelty_ground.py`, [#472](https://github.com/intel/dokimi/pull/472)); exec/source grading remain proposed.
 
 **Result:** Proposed grounding evidence for novelty checks; not a general correctness guarantee.
 
