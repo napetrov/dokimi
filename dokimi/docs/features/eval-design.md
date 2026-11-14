@@ -76,17 +76,17 @@ Before using documentation as agent context, run documentation metrics on struct
 
 ![Which needs are untested?: Map explicit test labels onto a frozen need graph.](../assets/features/28-which-needs-are-untested.webp)
 
-**Availability:** Partial — implemented core with a proposed extension.
+**Availability:** Available on main.
 
-Provide a frozen need graph and explicit needs labels on the eval checks. Inspect uncovered needs, relevance and supported coverage floors. Building the graph is a separate proposed extension.
+Provide a frozen need graph and explicit needs labels on the eval checks. Inspect uncovered needs, relevance and supported coverage floors. Building the graph is a separate step: `dokimi eval graph` (one model call, paid).
 
 **Input:** A frozen need graph and eval checks with explicit need labels.
 
-**Scope and limits:** Basic eval coverage in main; graph builder PR [#594](https://github.com/intel/dokimi/pull/594); broader [#331](https://github.com/intel/dokimi/issues/331).
+**Scope and limits:** Basic eval coverage in main; graph builder on main ([#594](https://github.com/intel/dokimi/pull/594)); broader [#331](https://github.com/intel/dokimi/issues/331).
 
 **Result:** Coverage gaps within the declared need-space model, not all possible user work.
 
-**Next step:** Use the existing coverage command with your frozen graph and explicit labels. Review the graph-builder proposal separately; its generated needs remain hypotheses.
+**Next step:** Use the existing coverage command with your frozen graph and explicit labels. Review the graph that `eval graph` builds separately; its generated needs remain hypotheses.
 
 [Coverage command reference](https://intel.github.io/dokimi/reference/cli/eval/) · [Implementation](../../dokimi/commands/eval_coverage.py) · [Back to feature tree](README.md)
 
@@ -96,15 +96,15 @@ Provide a frozen need graph and explicit needs labels on the eval checks. Inspec
 
 ![Which skill rules lack checks?: Suggest missing checks from the skill text.](../assets/features/29-which-skill-rules-lack-checks.webp)
 
-**Availability:** Open PR.
+**Availability:** Available on main.
 
-The proposed workflow maps checkable statements in a skill to existing checks and lists unmatched statements as candidates. A model-estimated mapping is not a verified coverage score or a gate.
+The workflow maps checkable statements in a skill to existing checks and lists unmatched statements as candidates. A model-estimated mapping is not a verified coverage score or a gate.
 
 **Input:** A SKILL.md and existing eval rows or executable task checks to map against its requirements.
 
-**Scope and limits:** PR [#441](https://github.com/intel/dokimi/pull/441): LLM-estimated candidates, not a verified coverage score.
+**Scope and limits:** LLM-estimated candidates from `eval skill-coverage` ([#441](https://github.com/intel/dokimi/pull/441)), not a verified coverage score.
 
-**Result:** A proposed rule-to-check mapping; see PR [#441](https://github.com/intel/dokimi/pull/441) for the current implementation before relying on it.
+**Result:** A rule-to-check mapping for review; see `dokimi eval skill-coverage --help`.
 
 **Next step:** Read the linked proposal for progress and the related guide for existing components. This card is not a runnable end-to-end interface.
 
@@ -142,7 +142,7 @@ Check whether tasks have useful headroom and protect held-out evaluation materia
 
 **Input:** Recorded arm outcomes, reference question content and repetition/cache provenance.
 
-**Scope and limits:** Headroom and run hygiene; replay provenance fix PR [#596](https://github.com/intel/dokimi/pull/596).
+**Scope and limits:** Headroom and run hygiene; the replay provenance fix ([#596](https://github.com/intel/dokimi/pull/596)) is on main.
 
 **Result:** Headroom diagnostics identifying cases with little room to distinguish variants.
 

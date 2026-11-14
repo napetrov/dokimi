@@ -22,7 +22,7 @@ Inspect persisted run artifacts, reports and dashboards without rerunning the mo
 
 **Input:** Stored run artifacts readable by the selected report reader, a saved baseline, comparable candidate results and explicit regression thresholds.
 
-**Scope and limits:** Support varies by track; unified JSON envelope PR [#590](https://github.com/intel/dokimi/pull/590). Baseline gates and the reusable no-model CI workflow are on main; full record/revalidate in [#318](https://github.com/intel/dokimi/issues/318)/[#121](https://github.com/intel/dokimi/issues/121)/[#138](https://github.com/intel/dokimi/issues/138).
+**Scope and limits:** Support varies by track; unified JSON envelope on main ([#590](https://github.com/intel/dokimi/pull/590)). Baseline gates and the reusable no-model CI workflow are on main; full record/revalidate in [#318](https://github.com/intel/dokimi/issues/318)/[#121](https://github.com/intel/dokimi/issues/121)/[#138](https://github.com/intel/dokimi/issues/138).
 
 **Result:** Inspectable stored artifacts and reports, and baseline comparison findings under configured thresholds.
 

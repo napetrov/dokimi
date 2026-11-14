@@ -21,7 +21,7 @@ Scan guidance claims against repository files, symbols, commands and build label
 
 **Input:** Your repository guidance and the paths, identifiers or commands it names.
 
-**Scope and limits:** Static scans / fence checks; Claude rules and imports in PR [#593](https://github.com/intel/dokimi/pull/593).
+**Scope and limits:** Static scans / fence checks; Claude rules and imports on main ([#593](https://github.com/intel/dokimi/pull/593)).
 
 **Result:** Static findings about guidance references and claims the scanner can check.
 
