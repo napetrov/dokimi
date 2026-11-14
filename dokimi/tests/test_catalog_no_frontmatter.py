@@ -203,6 +203,8 @@ def test_a_rule_then_prose_is_plain_markdown(tmp_path, text):
         "---\n---\nname: deck\ndescription: Use when decks.\n---\n# Deck\n",  # an empty block first
         "---\n\n---\n# Deck\n\nBuilds decks.\n",  # an empty block with a blank line in it
         "---\n   \n---\n# Deck\n\nBuilds decks.\n",  # an empty block with a whitespace line in it
+        "---\ntitle: x\ntags:\n  - a\n---\n# Deck\n",  # a list item among the keys: the block is still frontmatter
+        "---\n\nname: deck\ndescription: Use when decks.\n# Deck\n",  # no closing ---, a blank first line
     ],
 )
 def test_a_frontmatter_block_without_name_or_description_is_a_broken_skill_not_plain_markdown(tmp_path, text):
@@ -274,6 +276,15 @@ def test_an_empty_file_or_a_bom_before_frontmatter_is_not_plain_markdown(tmp_pat
     _plain(tmp_path, "odd", text)
     codes = [f.code for r in review_skills(read_skill_manifest(tmp_path)) if r for f in r.findings]
     assert "not-a-skill-no-frontmatter" not in codes
+
+
+@pytest.mark.parametrize("rule_index, plain", [(19, False), (20, True)])
+def test_the_late_frontmatter_window_is_the_first_twenty_lines(tmp_path, rule_index, plain):
+    # A --- on line 20 with name: after it is late frontmatter (a broken skill); on line 21 it is prose.
+    text = "# Deck\n\n" + "Notes.\n" * (rule_index - 2) + "---\nname: deck\ndescription: Use when decks.\n---\n"
+    _plain(tmp_path, "deck", text)
+    codes = [f.code for r in review_skills(read_skill_manifest(tmp_path)) if r for f in r.findings]
+    assert ("not-a-skill-no-frontmatter" in codes) is plain
 
 
 def test_prose_after_a_comment_on_its_line_is_the_description():
