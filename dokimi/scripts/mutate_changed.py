@@ -8,7 +8,7 @@ The by-hand step in ``AGENTS.md`` ("break the code it covers, confirm the test
 fails"), run by CI: a surviving mutant is a changed line that no test notices
 breaking. Steps:
 
-1. Changed lines: ``git diff -U0 BASE...HEAD`` over ``dokimi/dokimi/**.py``.
+1. Changed lines: ``git diff -U0`` of the working tree against the merge base of BASE and HEAD, over ``dokimi/dokimi/**.py``.
 2. Candidate tests: the files under ``tests/`` that import a changed module.
 3. Covering tests: one coverage run of those files with per-test contexts
    (``--cov-context=test``), one file at a time for at most half of ``--budget``,
