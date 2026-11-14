@@ -121,9 +121,11 @@ def test_changed_lines_reads_added_and_edited_lines(tmp_path: Path, monkeypatch:
 def test_markdown_lists_survivors_and_uncovered() -> None:
     m = mc.Mutant("dokimi/dokimi/x.py", 3, "flip-compare", (3, 4), (3, 10), "a != b", "a == b", status="survived", tests=["t"])
     k = mc.Mutant("dokimi/dokimi/x.py", 4, "return-none", (4, 8), (4, 9), "None", "a", status="killed")
-    text = mc.markdown({"mutants": [vars(m), vars(k)], "mutants_covered": 2, "max_mutants": 40,
+    k2 = mc.Mutant("dokimi/dokimi/x.py", 5, "return-none", (5, 8), (5, 9), "None", "a", status="killed")
+    e = mc.Mutant("dokimi/dokimi/x.py", 6, "return-none", (6, 8), (6, 9), "None", "a", status="error")
+    text = mc.markdown({"mutants": [vars(m), vars(k), vars(k2), vars(e)], "mutants_covered": 4, "max_mutants": 40,
                         "uncovered_lines": {"dokimi/dokimi/x.py": [7]}, "seconds": 1.0})
-    assert "1 killed" in text and "**1 survived**" in text
+    assert "2 killed" in text and "**1 survived**" in text and "1 errors" in text
     assert "| `dokimi/dokimi/x.py:3` | flip-compare | `a == b` | `a != b` | 1 |" in text
     assert "`dokimi/dokimi/x.py`: 7" in text
 
