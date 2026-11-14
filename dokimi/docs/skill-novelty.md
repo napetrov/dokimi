@@ -342,7 +342,7 @@ python cli.py skill novelty probe --artifact skill:path/to/skill --atoms atoms.j
     Each run keeps every judge's verdict in `judge_verdicts`. `analyze` writes them beside
     the record as `<record>.judge_verdicts.json`; the report names the panel instead of one judge.
 
-- Two judges of one vendor family print a warning. Same-family judges agree with each other
+- Two judges of one vendor family (the families named above) print a warning. Same-family judges agree with each other
   more than with the rest, so the panel then has fewer independent votes than judges. Three
   judges from three families cut the spread across panels from SD 0.039 to 0.025.
 
