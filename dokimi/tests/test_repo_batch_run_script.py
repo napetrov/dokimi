@@ -128,7 +128,13 @@ def test_a_bare_java_name_is_still_looked_up_on_path(tmp_path):
     ("Error: Temporal property InvocationEnds was violated.", 1, "no_fairness", "error rc=1", 1),
     ("Error: Invariant CancelContract is violated.", 12, "mut_no_cancel_guard", "violation CancelContract", 0),
     ("Error: Temporal property InvocationEnds was violated.", 13, "no_fairness", "violation InvocationEnds", 0),
-], ids=["pass-then-failure", "invariant-then-failure", "temporal-then-failure", "invariant-12", "temporal-13"])
+    ("Model checking completed. No error has been found.", 12, "fixed", "error rc=12", 1),
+    ("Usage: java -cp tla2tools.jar tlc2.TLC", 0, "fixed", "error rc=0", 1),
+    ("Error: Invariant CancelContract is violated.", 13, "mut_no_cancel_guard", "violation CancelContract", 0),
+    ("Error: Invariant First is violated.\nError: Invariant Second is violated.", 12, "mut_no_cancel_guard",
+     "violation Second", 1),  # the last violation named wins; this cfg expects CancelContract, so the run fails
+], ids=["pass-then-failure", "invariant-then-failure", "temporal-then-failure", "invariant-12", "temporal-13",
+        "pass-line-with-status-12", "completion-line-missing-status-0", "invariant-13", "last-named-violation"])
 def test_a_verdict_in_the_log_counts_only_with_the_status_tlc_gives_it(tmp_path, out, rc, cfg, got, exit_code):
     java = tmp_path / "fake-java"
     java.write_text(FAKE_TLC_STATUS, encoding="utf-8")
@@ -141,3 +147,64 @@ def test_a_verdict_in_the_log_counts_only_with_the_status_tlc_gives_it(tmp_path,
     row = (tmp_path / "out" / "summary.tsv").read_text(encoding="utf-8").splitlines()[1].split("\t")
     assert row[2] == got, res.stdout + res.stderr
     assert res.returncode == exit_code, res.stdout + res.stderr
+
+
+FAKE_TLC_BY_CFG = f"""#!{sys.executable} -I
+import os
+import sys
+
+cfg = sys.argv[sys.argv.index("-config") + 1]
+if os.path.basename(cfg).startswith("bad"):
+    print("Error: no such file")
+    sys.exit(1)
+print("Model checking completed. No error has been found.")
+sys.exit(0)
+"""
+
+
+def test_a_failing_cfg_fails_the_run_whichever_cfg_comes_after_it(tmp_path):
+    # a failing cfg followed by a passing one must still exit 1: the failure flag is not reset per cfg
+    java = tmp_path / "fake-java"
+    java.write_text(FAKE_TLC_BY_CFG, encoding="utf-8")
+    java.chmod(0o755)
+    (tmp_path / "tla2tools.jar").write_text("", encoding="utf-8")
+    for name in ("bad", "good"):
+        shutil.copy(FIXED, tmp_path / f"{name}.cfg")
+    env = {**os.environ, "TLA2TOOLS_JAR": str(tmp_path / "tla2tools.jar"), "OUT": str(tmp_path / "out"),
+           "JAVA": str(java)}
+    res = subprocess.run(["bash", str(RUN), str(tmp_path / "bad.cfg"), str(tmp_path / "good.cfg")], env=env,
+                         capture_output=True, text=True, check=False)
+    rows = {r.split("\t")[0]: r.split("\t") for r in
+            (tmp_path / "out" / "summary.tsv").read_text(encoding="utf-8").splitlines()[1:]}
+    assert rows["bad"][3] == "NO" and rows["good"][3] == "yes", res.stdout + res.stderr
+    assert res.returncode == 1, res.stdout + res.stderr
+
+
+def test_a_cfg_without_an_expect_line_is_not_ok(tmp_path):
+    # no EXPECT line gives no expected verdict: the cfg is not ok, even when TLC passes it
+    java = tmp_path / "fake-java"
+    java.write_text(FAKE_TLC_STATUS, encoding="utf-8")
+    java.chmod(0o755)
+    (tmp_path / "tla2tools.jar").write_text("", encoding="utf-8")
+    cfg = tmp_path / "noexpect.cfg"
+    cfg.write_text("".join(line for line in FIXED.read_text(encoding="utf-8").splitlines(True)
+                           if "EXPECT:" not in line), encoding="utf-8")
+    env = {**os.environ, "TLA2TOOLS_JAR": str(tmp_path / "tla2tools.jar"), "OUT": str(tmp_path / "out"),
+           "JAVA": str(java), "FAKE_TLC_OUT": "Model checking completed. No error has been found.",
+           "FAKE_TLC_RC": "0"}
+    res = subprocess.run(["bash", str(RUN), str(cfg)], env=env, capture_output=True, text=True, check=False)
+    row = (tmp_path / "out" / "summary.tsv").read_text(encoding="utf-8").splitlines()[1].split("\t")
+    assert row[3] == "NO", res.stdout + res.stderr
+    assert res.returncode == 1, res.stdout + res.stderr
+
+
+def test_a_relative_out_is_made_absolute_for_the_tlc_metadir(tmp_path):
+    # the fake records its arguments: TLC's -metadir must be under the caller's OUT, not relative to run.sh's directory
+    (tmp_path / "tla2tools.jar").write_text("", encoding="utf-8")
+    env = {**os.environ, "TLA2TOOLS_JAR": "tla2tools.jar", "OUT": "out", "JAVA": str(_fake_java(tmp_path)),
+           "FAKE_TLC_LOG": str(tmp_path / "tlc.log")}
+    res = subprocess.run(["bash", str(RUN), str(FIXED)], cwd=tmp_path, env=env, capture_output=True, text=True,
+                         check=False)
+    assert res.returncode == 0, res.stdout + res.stderr
+    args = (tmp_path / "tlc.log").read_text(encoding="utf-8")
+    assert str((tmp_path / "out" / "states" / "fixed").resolve()) in args
