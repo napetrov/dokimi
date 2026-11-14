@@ -579,3 +579,10 @@ def test_an_abs_only_approx_reads_its_relative_tolerance_as_zero():
         "loosens a tolerance"]
     rel_before = base.replace("abs=1e-12)", "rel=1e-9, abs=1e-12)")
     assert ctn.compare(rel_before, base) == []
+
+
+def test_swapped_tolerances_of_calls_in_one_assert_without_a_comparison_are_named():
+    base = "import math\n\n\ndef test_a(f, g):\n    assert math.isclose(f(), 1, rel_tol=1e-9) and math.isclose(g(), 1, rel_tol=1e-3)\n"
+    swapped = base.replace("rel_tol=1e-9", "rel_tol=TMP").replace("rel_tol=1e-3", "rel_tol=1e-9").replace(
+        "rel_tol=TMP", "rel_tol=1e-3")
+    assert [what for _, _, what in ctn.compare(base, swapped)] == ["loosens a tolerance"]

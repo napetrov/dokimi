@@ -205,7 +205,8 @@ def _read_tolerances(call: ast.Call, shape: Shape, context: str | None = None) -
     for kind, default in API_DEFAULTS.get(api, {}).items():
         tolerances.setdefault(kind, default)
     others = [kw for kw in call.keywords if kw not in named]
-    key = context if context is not None else ast.dump(ast.Call(call.func, call.args, others))
+    own = ast.dump(ast.Call(call.func, call.args, others))
+    key = own if context is None else f"{context}|{own}"
     shape.tolerances.append((key, tolerances))
 
 
