@@ -5,17 +5,27 @@
 
 from __future__ import annotations
 
-from .measure import BASELINE_ARM, ProbeRun, paired_outcomes
+from .measure import BASELINE_ARM, ERRORED, ProbeRun, paired_outcomes, resolve_verdict
+from .client import vendor_of
 from .panel import SENSITIVE_RANGE, shared_vendors
 
 SCORINGS = ("lenient", "strict")
+
+
+def _own_verdict(run: ProbeRun, model: str) -> str:
+    """The verdict ``model`` gave ``run``, with the run's program checks applied as the headline
+    applies them; a judge that cast no vote (a spend stop, a failed call) is a missing datum."""
+    raw = (run.judge_verdicts or {}).get(model)
+    if raw is None:
+        return ERRORED
+    return resolve_verdict(raw, run.checks)[0] if run.checks else raw
 
 
 def _own_runs(runs: list[ProbeRun], model: str) -> list[ProbeRun]:
     """``runs`` with each verdict replaced by the verdict ``model`` gave it."""
     return [
         ProbeRun(atom_id=r.atom_id, probe_kind=r.probe_kind, arm=r.arm, question=r.question,
-                 response=r.response, verdict=(r.judge_verdicts or {}).get(model, r.verdict))
+                 response=r.response, verdict=_own_verdict(r, model))
         for r in runs
     ]
 
@@ -47,7 +57,7 @@ def _added_range(per_judge_runs: dict[str, list[ProbeRun]], with_arm: str,
     return round(max(shares) - min(shares), 4)
 
 
-def panel_record(measure_result, rule: str) -> dict | None:
+def panel_record(measure_result, rule: str, answerer_model: str | None = None) -> dict | None:
     """The ``judge_panel`` block of a probe or novelty record: who judged, the rule, each
     judge's own paired 2×2, the judge range of the added share, and a sensitivity flag.
 
@@ -75,6 +85,10 @@ def panel_record(measure_result, rule: str) -> dict | None:
         "judges": judges,
         "rule": rule,
         "shared_vendors": shared_vendors(judges),
+        "same_vendor_as_answerer": [m for m in judges if answerer_model and vendor_of(m)
+                                    and vendor_of(m) == vendor_of(answerer_model)],
+        "failed_grades": {m: sum((r.judge_verdicts or {}).get(m) == ERRORED for r in runs)
+                          for m in judges},
         "per_judge_paired": per_judge,
         "added_share_range": added_range,
         "judge_sensitive": lenient_range is not None and lenient_range > SENSITIVE_RANGE,

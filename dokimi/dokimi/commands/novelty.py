@@ -258,7 +258,7 @@ def cmd_novelty_probe(args: argparse.Namespace) -> None:
         probe_set=probe_set, measure_result=result,
         sampling=sampling_record(args, atoms, saved), framing=args.context_framing,
     )
-    attach_panel(payload, result, args.judge_aggregate)
+    attach_panel(payload, result, args.judge_aggregate, answerer.model)
     stamp(payload, args, result, answerer=answerer, judge=judge, judge2=judge2)
     out = Path(args.out) if args.out else _default_dir(args.artifact) / "probes.json"
     # A run the cap stopped keeps the answers it paid for, as a partial result (and exits).

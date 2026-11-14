@@ -121,8 +121,8 @@ def add_panel_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--judge-aggregate", default="median", dest="judge_aggregate",
                         choices=("median", "majority", "unanimous"),
                         help="How a panel's verdicts become one: median of the verdict scale "
-                             "(default), lenient majority, or unanimous (conservative; moved "
-                             "the study's headline by up to 0.20)")
+                             "(default), lenient majority, or unanimous (every judge must agree; "
+                             "not conservative, it can raise the added share)")
 
 
 def panel_clients(args: argparse.Namespace, make_client) -> tuple:
@@ -137,12 +137,12 @@ def panel_clients(args: argparse.Namespace, make_client) -> tuple:
     return tuple(make_client(model, provider, "judge", args) for model, provider in refs[1:])
 
 
-def attach_panel(payload: dict, result, aggregate: str) -> None:
+def attach_panel(payload: dict, result, aggregate: str, answerer_model: str | None = None) -> None:
     """Add the ``judge_panel`` block to a written record and print its warnings."""
     from dokimi.novelty.panel_record import panel_record
     from dokimi.novelty.panel import panel_warnings
 
-    judge_panel = panel_record(result, aggregate)
+    judge_panel = panel_record(result, aggregate, answerer_model)
     if judge_panel:
         payload["judge_panel"] = judge_panel
         for note in panel_warnings(judge_panel):
@@ -155,8 +155,9 @@ def save_panel_verdicts(result, out: Path) -> Path | None:
     import json
 
     runs = [run.as_dict() for run in result.measure_result.runs if run.judge_verdicts]
-    if not runs:
-        return None
     dest = out.with_name(f"{out.stem}.judge_verdicts.json")
+    if not runs:  # a single-judge run into the same output: the panel's file is not this run's
+        dest.unlink(missing_ok=True)
+        return None
     dest.write_text(json.dumps(runs, indent=2), encoding="utf-8")
     return dest

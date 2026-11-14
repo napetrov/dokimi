@@ -93,6 +93,13 @@ def panel_warnings(record: dict | None) -> list[str]:
         out.append(f"judge panel has {len(models)} judges from one vendor ({vendor}: "
                    f"{', '.join(models)}); judges of one family agree with each other more "
                    "than with the rest, so the panel counts them nearly once")
+    for model in record.get("same_vendor_as_answerer", []):
+        out.append(f"judge {model} is of the answerer's vendor: a judge can favour answers of its "
+                   "own vendor; pass a --judge of another vendor")
+    for model, failed in sorted(record.get("failed_grades", {}).items()):
+        if failed:
+            out.append(f"judge {model} failed to grade {failed} answer(s); its vote is left out "
+                       "of those verdicts")
     if record["judge_sensitive"]:
         out.append(f"judge-sensitive: the lenient added share varies by "
                    f"{record['added_share_range']['lenient']:.2f} across the panel's judges "

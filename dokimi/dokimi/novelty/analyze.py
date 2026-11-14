@@ -338,7 +338,7 @@ def _analyze(
         panel=panel, aggregate=aggregate,
     )
     _refuse_cut_short(measure_result)
-    judge_panel = panel_record_mod.panel_record(measure_result, aggregate)
+    judge_panel = panel_record_mod.panel_record(measure_result, aggregate, answerer.model)
     warnings.extend(panel_mod.panel_warnings(judge_panel))
     progress.stage = "classify"
     if config.allow_self_judge and panel_mod.same_as_answerer((judge, *panel), answerer):

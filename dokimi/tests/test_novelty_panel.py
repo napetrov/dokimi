@@ -196,6 +196,34 @@ def test_added_range_is_taken_on_the_pairs_every_judge_graded():
     assert rec["judge_sensitive"] is False
 
 
+def test_a_judge_sees_the_veto_its_own_verdict_meets_and_a_missing_vote_is_no_datum():
+    veto = [{"role": "veto", "passed": False}]
+    runs = [
+        _run("a", BASELINE_ARM, {"j1": WO, "j2": WO}),
+        _run("a", "full", {"j1": CC, "j2": CC}),  # the veto fails: both judges' CC is wrong_other
+        _run("b", BASELINE_ARM, {"j1": WO, "j2": WO}),
+        _run("b", "full", {"j1": CC}),  # j2 cast no vote on this answer (a spend stop)
+    ]
+    runs[1].checks = veto
+    rec = panel_record(MeasureResult(runs=runs, arms=(BASELINE_ARM, "full")), "median")
+    assert rec["per_judge_paired"]["j1"]["lenient"]["added"] == 0.5  # pair a: the veto makes it redundant
+    j2 = rec["per_judge_paired"]["j2"]["lenient"]
+    assert (j2["n_paired"], j2["n_unpaired_dropped"], j2["added"]) == (1, 1, 0.0)
+
+
+def test_panel_warns_for_each_judge_of_the_answerers_vendor_and_for_a_failing_judge():
+    err = "error"
+    runs = [_run("a", BASELINE_ARM, {"claude-opus-5": WO, "gpt-6-luna": err}),
+            _run("a", "full", {"claude-opus-5": CC, "gpt-6-luna": err})]
+    rec = panel_record(MeasureResult(runs=runs, arms=(BASELINE_ARM, "full")), "median",
+                       "claude-sonnet-5")
+    assert rec["same_vendor_as_answerer"] == ["claude-opus-5"]
+    assert rec["failed_grades"] == {"claude-opus-5": 0, "gpt-6-luna": 2}
+    warnings = panel_warnings(rec)
+    assert any("claude-opus-5 is of the answerer's vendor" in w for w in warnings)
+    assert any("gpt-6-luna failed to grade 2" in w for w in warnings)
+
+
 def test_a_range_of_exactly_the_threshold_is_not_judge_sensitive():
     runs = []
     for i in range(10):  # j1 sees one probe gained, j2 none: a range of exactly 0.10
@@ -219,6 +247,25 @@ def test_estimate_counts_each_panel_judges_grading_calls():
     single = dict(estimate, by_role=dict(estimate["by_role"]))
     add_panel_calls(_args(judges=["openai/a"]), single)
     assert single == estimate
+
+
+def test_estimate_only_counts_each_panel_judge_at_the_command(tmp_path, capsys):
+    from dokimi.cli import build_parser
+
+    (tmp_path / "SKILL.md").write_text("---\nname: s\ndescription: d\n---\n\n# S\n\nText.\n",
+                                       encoding="utf-8")
+    def estimate(*judges):
+        flags = [f for j in judges for f in ("--judge", j)]
+        args = build_parser().parse_args(["skill", "novelty", "analyze", "--artifact",
+                                          f"skill:{tmp_path}", "--estimate-only", *flags])
+        args.func(args)
+        out = json.loads(capsys.readouterr().out)
+        return dict(out["estimate"], expected_usd=out["expected_usd"])
+    one = estimate("openai/gpt-5.6-luna")
+    three = estimate("openai/gpt-5.6-luna", "anthropic/claude-sonnet-5", "openai/gpt-6-luna")
+    assert three["by_role"]["judge"] == 3 * one["by_role"]["judge"]
+    assert three["probe_calls"] > one["probe_calls"]
+    assert three["expected_usd"] > one["expected_usd"]
 
 
 def test_estimate_only_refuses_an_unusable_judge(tmp_path):
@@ -248,6 +295,7 @@ def test_the_report_names_the_panel_and_analyze_saves_each_verdict(tmp_path):
     single = type("R", (), {"measure_result": MeasureResult(
         runs=[ProbeRun("a", "direct", "full", "q", "r", WO)])})()
     assert save_panel_verdicts(single, out) is None
+    assert not dest.exists()  # a one-judge run into the same output does not leave the panel's file
 
 
 def _capped_judge(model: str, verdict: str, *, priced: bool, truncated: bool = False):
@@ -284,3 +332,27 @@ def test_a_truncated_judge_reply_under_a_cap_is_a_failed_grade():
     result = run_measurement(atoms, probes, "t", answerer=answerer, judge=judge, concurrency=1)
     assert all(r.verdict == "error" for r in result.runs)
     assert result.ungraded == len(result.runs)
+
+
+def test_analyze_refuses_a_panel_member_that_answers_before_any_paid_call(tmp_path, monkeypatch):
+    from dokimi.cli import build_parser
+    from dokimi.novelty import cost
+    from dokimi.novelty.client import LLMClient
+
+    (tmp_path / "SKILL.md").write_text("---\nname: s\ndescription: d\n---\n\n# S\n\nText.\n",
+                                       encoding="utf-8")
+    base = ["skill", "novelty", "analyze", "--artifact", f"skill:{tmp_path}"]
+    answer_model, answer_provider = cost.role_models(build_parser().parse_args(base))["answerer"]
+    calls: list[str] = []
+
+    def transport(prompt, system):
+        calls.append(prompt)  # any call here is a paid one that the refusal should have stopped
+        raise AssertionError("a paid call happened before the self-judge refusal")
+
+    monkeypatch.setattr(cost, "client",
+                        lambda model, provider, role, args: LLMClient(model=model, transport=transport))
+    args = build_parser().parse_args(
+        [*base, "--judge", f"{answer_provider}/{answer_model}", "--judge", "openai/gpt-6-luna"])
+    with pytest.raises(InputError, match=answer_model):
+        args.func(args)
+    assert calls == []
