@@ -6,7 +6,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any, Dict
@@ -321,7 +323,9 @@ def cmd_questions_generate(args: argparse.Namespace) -> None:
         except ValueError as exc:
             raise InputError(str(exc)) from exc
 
-        extractor = RagasSeedExtractor(mcp_client=mcp_client, cache_dir=Path(".cache/topics"))
+        # Keyed on the source as in the pipeline: a registered product has one library id for every source.
+        source_key = hashlib.sha256(os.fsencode(doc_source)).hexdigest()[:16]
+        extractor = RagasSeedExtractor(mcp_client=mcp_client, cache_dir=Path(".cache/topics") / source_key)
         topics = extractor.extract_topics(
             library_id=library_id,
             library_name=args.product,
@@ -360,7 +364,7 @@ def cmd_questions_generate(args: argparse.Namespace) -> None:
     output_path = Path(args.output) if args.output else Path(f"questions/{args.product}.json")
     try:
         with exit_on_unwritable(output_path):
-            generator.save_questions(questions, output_path)
+            generator.save_questions(questions, output_path, product=args.product)
     except ValueError as exc:  # ArtifactValidationError: the generated set is not valid v2
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
