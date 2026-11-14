@@ -23,7 +23,7 @@ SPEC_NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")  # the spec's name pattern (
 _NON_PRINTABLE = re.compile(r"[^\t\n\r\x20-\x7e\x85\xa0-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]")  # PyYAML's reader
 DESCRIPTION_HINT_MAX = 300
 SETEXT_UNDERLINE_RE = re.compile(r"=+")  # the underline of a setext H1 (a --- one is a rule or an H2)
-_COMMENT_RE = re.compile(r"<!--.*?(?:-->|\Z)", re.S)  # an unclosed comment runs to the end, as in CommonMark
+_COMMENT_RE = re.compile(r"(`+).+?\1|<!--.*?-->|^[ \t]*<!--(?!.*?-->).*\Z", re.S | re.M)  # code spans kept; an unclosed comment that opens a line runs to the end
 
 
 def no_frontmatter_message(lines: list[str], dir_name: str, at_root: bool = False) -> str:
@@ -69,7 +69,7 @@ def no_frontmatter_message(lines: list[str], dir_name: str, at_root: bool = Fals
 
 def _without_comments(text: str) -> list[str]:
     """The lines of ``text`` with its HTML comments taken out; text around a comment on its line is kept."""
-    return _COMMENT_RE.sub("", text).split("\n")
+    return _COMMENT_RE.sub(lambda m: m.group(0) if m.group(0).startswith("`") else "", text).split("\n")
 
 
 def _first_paragraph(raw: list[str]) -> list[str]:

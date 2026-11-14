@@ -295,3 +295,13 @@ def test_prose_after_a_comment_on_its_line_is_the_description():
 def test_a_comment_that_opens_mid_line_is_taken_out_with_its_lines():
     lines = ["# T", "", "Intro words <!-- start", "hidden note", "-->", "after."]
     assert _block(no_frontmatter_message(lines, "t", at_root=True))["description"] == "Intro words after."
+
+
+def test_a_comment_marker_in_a_code_span_or_unclosed_mid_line_is_text():
+    # Only a closed comment, or one that opens a line and runs to the end, is taken out.
+    assert _block(no_frontmatter_message(["# T", "", "Write `<!--` to open a comment.", "", "More text."], "t", at_root=True))[
+        "description"] == "Write `<!--` to open a comment."
+    assert _block(no_frontmatter_message(["# T", "", "Intro <!-- never closed.", "", "Second."], "t", at_root=True))[
+        "description"] == "Intro <!-- never closed."
+    assert _block(no_frontmatter_message(["Intro with `<!--` token.", "", "# Deck Builder", "", "Builds decks."], "d", at_root=True))[
+        "name"] == "deck-builder"
