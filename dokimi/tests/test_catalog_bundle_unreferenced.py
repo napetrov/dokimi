@@ -544,7 +544,7 @@ def test_a_nested_link_to_the_skill_root_names_the_files_under_it(tmp_path):
     assert _unreferenced(review) == []
 
 
-@pytest.mark.parametrize(("prose", "name"), [("Run my\\_script.py.\n", "my_script.py"), ("Run my\\~script.py.\n", "my~script.py")])
+@pytest.mark.parametrize(("prose", "name"), [("Run my\\_script.py.\n", "my_script.py"), ("Run my\\~script.py.\n", "my~script.py"), ("Run my\\*script.py.\n", "my*script.py")])
 def test_a_markdown_escape_in_prose_is_not_a_folder_separator(tmp_path, prose, name):
     # A backslash before _, * or ~ is a Markdown escape, not a Windows path separator.
     review = _review_with_texts(tmp_path, prose, {name: "x\n"})
