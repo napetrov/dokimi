@@ -261,7 +261,20 @@ def _pytest(
     return done.returncode, done.stdout + done.stderr
 
 
-_SUMMARY = re.compile(r"^(?:FAILED|ERROR) (.+?)(?: - .*)?$", re.MULTILINE)
+def _failed(log: str, ids: set[str]) -> tuple[set[str], list[str]]:
+    """The ids in ``ids`` that pytest's summary names as failed, and the summary's other names.
+
+    A summary line is ``FAILED <node id> - <message>``, and a node id can hold `` - `` (a parameter), so the
+    known ids are matched whole; only a name that matches none is cut at the first `` - ``.
+    """
+    def names(line: str) -> bool:
+        return any(line == i or line.startswith(i + " - ") for i in ids)
+
+    lines = re.findall(r"^(?:FAILED|ERROR) (.+)$", log, re.MULTILINE)
+    named = {i for i in ids if any(line == i or line.startswith(i + " - ") for line in lines)}
+    return named, [line.split(" - ", 1)[0] for line in lines if not names(line)]
+
+
 _PASSED = re.compile(r"\b[1-9]\d* passed\b")  # the final pytest line of a run in which a test ran
 _COLLECTION_ERROR = "ERROR collecting "  # a module that does not import: the mutant broke it (pytest's exit code for this varies)
 
@@ -300,7 +313,8 @@ def covering_tests(
             return by_file, failing, tests[i:]
         data_file.unlink(missing_ok=True)
         rc, log = _pytest(
-            work / "dokimi", ["-rfE", "--cov=dokimi", "--cov-context=test", "--cov-report=", test], left,
+            work / "dokimi", ["-rfEp", "--cov=dokimi", "--cov-context=test", "--cov-report=", test], left,
+            # -rp lists PASSED ids too (without the captured output of passing tests): a test that reads an import-time value has no context on the file's lines.
             # sys.monitoring (the default core on 3.14+) records no per-test contexts.
             env={"COVERAGE_CORE": "ctrace"},
         )
@@ -309,21 +323,24 @@ def covering_tests(
         if rc not in (0, 1, 5) or not data_file.exists():
             failing.append(test)
             continue
-        bad = set(_SUMMARY.findall(log)) if rc == 1 else set()
-        failing += sorted(bad)
         ran = _PASSED.search(log) is not None
         data = coverage.CoverageData(basename=str(data_file))
         data.read()
         measured = {Path(f).resolve(): f for f in data.measured_files()}
-        for rel in paths:
-            f = measured.get((work / rel).resolve())
-            if f is None:
-                continue
+        per_file = {rel: data.contexts_by_lineno(measured[(work / rel).resolve()])
+                    for rel in paths if (work / rel).resolve() in measured}
+        executed = {c.rsplit("|", 1)[0] for ctxs in per_file.values() for cs in ctxs.values() for c in cs if c}
+        passed = set(re.findall(r"^PASSED (.+)$", log, re.MULTILINE))
+        # a passing test that errors in teardown is both PASSED and ERROR: its ERROR makes it bad
+        bad, unmatched = _failed(log, executed | passed) if rc == 1 else (set(), [])
+        failing += sorted(bad) + unmatched
+        for rel, ctxs in per_file.items():
             lines = by_file.setdefault(rel, {})
-            for ln, cs in data.contexts_by_lineno(f).items():
+            for ln, cs in ctxs.items():
                 ids = {c.rsplit("|", 1)[0] for c in cs if c}
-                if "" in cs and not bad and ran:  # run at collection (an import-time constant or default): the file's tests run it
-                    ids.add(test)
+                if "" in cs and ran:  # run at collection (an import-time constant or default): every test of the file runs it
+                    # with no failure, the file's tests; with one, the tests of the file that passed
+                    ids |= {test} if not (bad or unmatched) else passed - bad
                 if ids := ids - bad:
                     lines[ln] = sorted(set(lines.get(ln, [])) | ids)
     return by_file, failing, []

@@ -407,3 +407,65 @@ def test_an_import_time_line_is_attributed_only_when_a_test_ran(
     assert (failing, not_run) == ([], [])
     expected = {1: ["tests/test_zz.py"], 4: ["tests/test_zz.py::test_a"]} if attributed else {4: ["tests/test_zz.py::test_a"]}
     assert by_file == {"dokimi/dokimi/zz.py": expected}
+
+
+def _stub_covering(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, contexts: dict[int, set[str]], rc: int, log: str) -> None:
+    zz = tmp_path / "dokimi" / "dokimi" / "zz.py"
+    zz.parent.mkdir(parents=True, exist_ok=True)
+
+    class Data:
+        def __init__(self, basename: str) -> None:
+            pass
+
+        def read(self) -> None:
+            pass
+
+        def measured_files(self) -> list[str]:
+            return [str(zz)]
+
+        def contexts_by_lineno(self, f: str) -> dict[int, set[str]]:
+            return contexts
+
+    def pytest_run(cwd: Path, args: list[str], timeout: float, env: dict[str, str] | None = None) -> tuple[int, str]:
+        (cwd / ".coverage").write_text("", encoding="utf-8")
+        return rc, log
+
+    monkeypatch.setitem(sys.modules, "coverage", types.SimpleNamespace(CoverageData=Data))
+    monkeypatch.setattr(mc, "_pytest", pytest_run)
+
+
+def test_a_failing_id_with_a_dash_in_its_parameter_is_matched_whole(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    node = "tests/test_zz.py::test_f[a - b]"
+    _stub_covering(monkeypatch, tmp_path, {2: {f"{node}|run"}}, 1, f"FAILED {node} - AssertionError\n")
+    by_file, failing, _ = mc.covering_tests(tmp_path, ["tests/test_zz.py"], ["dokimi/dokimi/zz.py"], 60)
+    assert by_file == {"dokimi/dokimi/zz.py": {}}
+    assert failing == [node]
+
+
+def test_an_import_time_line_in_a_mixed_file_is_credited_to_its_passing_tests(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    contexts = {1: {""}, 4: {"tests/test_zz.py::test_ok|run", "tests/test_zz.py::test_bad|run"}}
+    log = "FAILED tests/test_zz.py::test_bad - assert False\nPASSED tests/test_zz.py::test_ok\n=== 1 failed, 1 passed in 0.01s ===\n"
+    _stub_covering(monkeypatch, tmp_path, contexts, 1, log)
+    by_file, failing, _ = mc.covering_tests(tmp_path, ["tests/test_zz.py"], ["dokimi/dokimi/zz.py"], 60)
+    assert by_file == {"dokimi/dokimi/zz.py": {1: ["tests/test_zz.py::test_ok"], 4: ["tests/test_zz.py::test_ok"]}}
+    assert failing == ["tests/test_zz.py::test_bad"]
+
+
+def test_an_import_time_line_in_a_mixed_file_is_credited_to_every_passing_test(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # test_const passes and reads the constant without executing a line of the file: it has no context there
+    contexts = {1: {""}, 4: {"tests/test_zz.py::test_fn|run"}}
+    log = ("FAILED tests/test_zz.py::test_bad - assert False\nPASSED tests/test_zz.py::test_const\n"
+           "PASSED tests/test_zz.py::test_fn\n=== 1 failed, 2 passed in 0.01s ===\n")
+    _stub_covering(monkeypatch, tmp_path, contexts, 1, log)
+    by_file, _, _ = mc.covering_tests(tmp_path, ["tests/test_zz.py"], ["dokimi/dokimi/zz.py"], 60)
+    assert by_file["dokimi/dokimi/zz.py"][1] == ["tests/test_zz.py::test_const", "tests/test_zz.py::test_fn"]
+
+
+def test_a_passing_test_that_errors_in_teardown_is_not_credited_to_an_import_time_line(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    contexts = {1: {""}, 4: {"tests/test_zz.py::test_fn|run"}}
+    log = ("FAILED tests/test_zz.py::test_bad - assert False\nPASSED tests/test_zz.py::test_const\n"
+           "PASSED tests/test_zz.py::test_fn\nERROR tests/test_zz.py::test_const - teardown boom\n"
+           "=== 1 failed, 2 passed, 1 error in 0.01s ===\n")
+    _stub_covering(monkeypatch, tmp_path, contexts, 1, log)
+    by_file, _, _ = mc.covering_tests(tmp_path, ["tests/test_zz.py"], ["dokimi/dokimi/zz.py"], 60)
+    assert by_file["dokimi/dokimi/zz.py"][1] == ["tests/test_zz.py::test_fn"]
