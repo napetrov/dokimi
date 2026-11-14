@@ -804,7 +804,7 @@ with any failed model call writes the result and exits non-zero. The saved file 
 field rule under `field` (`include_disabled`, `include_invalid`, `keep_copies_under`, the `competitors` and what was
 `left_out`, which also names each skill left out for a conflicting name or a spec error, and `spec_warnings`, one
 `{skill, length, limit, message}` per kept skill whose description is over 1024 characters); a single-artifact run
-records it too. An all-vs-all run also lists in `field.dropped_queries` each skill whose queries it dropped, as
+records it too. An all-vs-all result also records `shared_queries` (`{shared, total}`: how many of the queries with a content word are listed for more than one skill), so a file saved from a run on shared queries says so. An all-vs-all run also lists in `field.dropped_queries` each skill whose queries it dropped, as
 `{skill, reasons, keep_flags, queries}`, one record per skill, with each reason `disabled`, `invalid` or `conflict`. A query for a catalog skill
 that failed to load refuses the run and names the load error. It refuses `--artifact`, `--queries` and `--queries-from-headings`: it takes `--queries-by-skill` only. `--estimate-only` prints the calls and the
 list-price cost of the whole run as JSON, in the shape of a single-artifact estimate, with no client built and
@@ -855,15 +855,16 @@ between repeats keeps its picks but is left out of `noise`. The lexical arm is c
 Treat a `partial` file as a prefix of the run, not a measurement of the whole field: the skills
 and queries reached first are over-represented. To finish, raise `--max-usd` and rerun with
 `DOKIMI_RESPONSE_CACHE` set (it must also have been set on the capped run), which replays the
-calls already paid for at no cost. `skill shorten` still writes nothing when the cap stops it;
-`atoms`, `probe` and `analyze` keep the calls they made as a partial result.
+calls already paid for at no cost. `skill shorten` still writes nothing when the cap stops it
+(it keeps its verdicts in `--cache-dir`, below); `atoms`, `probe` and `analyze` keep the calls they made as a partial result.
 
 Three properties worth knowing before quoting either:
 
 - **Competitors are mandatory.** The existing `skill-agent:` arm offers one skill, which
   makes selection a binary did-it-load question. The real failure is picking the wrong
-  *sibling*: measured lexically over the 33-skill corpus, every `dpnp-*` skill scored
-  **0.0** recall@1 against its siblings.
+  *sibling*. Siblings built from one template have identical heading queries, so heading-query
+  recall@1 at the family level measures the template; check sibling confusion with queries
+  written independently of the skills.
 - **The queries must come from outside the artifact**, or it defines both the problem scope
   and its own relevance. `--queries-from-headings` exists for triage, warns, and stamps
   `queries_self_derived: true` into the result; corpus-wide those self-derived queries gave
@@ -1159,7 +1160,11 @@ with `status: "partial"` but no `partial` block is refused too, and so is saving
 chosen, as a finished record does, and every extracted atom for a stop in extraction (`atoms.sampling`
 is then `none`, and `run_config` holds the settings of the run but not its tier). A library caller of
 `dokimi.novelty.analyze()` checks `result.partial` before it saves `result.artifact`.
-`shorten` still loses its work at the cap (a follow-up). Before its first paid
+`shorten` writes no candidate table and
+no `--out` file at the cap (a table scored on part of the verdicts would read as a result), but each
+retention verdict is stored in `--cache-dir` the moment it is adjudicated: the exit message names how many verdicts are stored (or, without `--cache-dir`, were adjudicated) and,
+with `--cache-dir`, that a rerun with a higher `--max-usd` and the same `--cache-dir` replays them at $0; without it, that
+`--cache-dir <dir>` would have kept them, or, with `DOKIMI_RESPONSE_CACHE` set to a writable directory, that the paid calls are in the response cache and a rerun replays them at $0. After a `no_price` stop (a model with no known price) the call that came back was paid for but its verdict is not stored, and the message says so. Before its first paid
 call `analyze` prints the run's expected cost at list prices to stderr.
 
 The estimate payload has `expected_calls`, the point figure between
