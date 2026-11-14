@@ -23,7 +23,11 @@ SPEC_NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")  # the spec's name pattern (
 _NON_PRINTABLE = re.compile(r"[^\t\n\r\x20-\x7e\x85\xa0-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]")  # PyYAML's reader
 DESCRIPTION_HINT_MAX = 300
 SETEXT_UNDERLINE_RE = re.compile(r"=+")  # the underline of a setext H1 (a --- one is a rule or an H2)
-_COMMENT_RE = re.compile(r"(`+).+?\1|<!--.*?-->|^[ \t]*<!--(?!.*?-->).*\Z", re.S | re.M)  # code spans kept; an unclosed comment that opens a line runs to the end
+# Code spans and inline comments stay in their paragraph; a comment that opens a line may run over blank lines.
+_COMMENT_RE = re.compile(
+    r"(`+)(?:(?!\n[ \t]*\n).)+?\1|^[ \t]*<!--(?!.*?-->).*\Z|^[ \t]*<!--.*?-->|<!--(?:(?!\n[ \t]*\n).)*?-->",
+    re.S | re.M,
+)  # the unclosed one at a line start runs to the end
 
 
 def no_frontmatter_message(lines: list[str], dir_name: str, at_root: bool = False) -> str:

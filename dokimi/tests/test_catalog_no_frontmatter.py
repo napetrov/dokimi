@@ -305,3 +305,11 @@ def test_a_comment_marker_in_a_code_span_or_unclosed_mid_line_is_text():
         "description"] == "Intro <!-- never closed."
     assert _block(no_frontmatter_message(["Intro with `<!--` token.", "", "# Deck Builder", "", "Builds decks."], "d", at_root=True))[
         "name"] == "deck-builder"
+
+
+def test_a_marker_or_backtick_does_not_reach_across_a_blank_line():
+    # A mid-line comment or a code span stays in its paragraph; a comment that opens a line may span blank lines.
+    stray = ["# T", "", "Intro <!-- never closed.", "", "Second.", "", "<!-- real -->"]
+    assert _block(no_frontmatter_message(stray, "t", at_root=True))["description"] == "Intro <!-- never closed."
+    paired = ["Intro with ` tick.", "", "# T", "", "<!--", "TODO: fill in", "-->", "", "Real.", "", "More ` here."]
+    assert _block(no_frontmatter_message(paired, "t", at_root=True))["description"] == "Real."
