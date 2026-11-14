@@ -507,3 +507,61 @@ def test_a_moved_test_with_an_inline_waiver_at_its_destination_is_waived():
     unwaived = ctn.tests_in(moved % "# reworded")["test_close"]
     assert [what for _, _, what in ctn.compare(BASE, head, {base_shape.body: [unwaived]})] == [
         "moved, and adds a skip or xfail"]
+
+
+def test_a_moved_test_matches_one_removed_twin_only():
+    base = "def test_p():\n    assert 1\n\n\ndef test_q():\n    assert 1\n"
+    shape = ctn.tests_in("def test_r():\n    assert 1\n")["test_r"]
+    assert ctn.compare(base, None, {shape.body: [shape]}) == [("test_q", 0, "removed")]
+
+
+def test_main_names_a_removed_test_whose_twin_survives(tmp_path, monkeypatch):
+    _repo(tmp_path)
+    (tmp_path / "tests" / "test_b.py").write_text(OTHER + "\n\ndef test_twin():\n    assert round(0.1 + 0.2, 9) == 0.3\n",
+                                                  encoding="utf-8")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "twin")
+    _git(tmp_path, "tag", "twin")
+    (tmp_path / "tests" / "test_b.py").write_text("def test_twin():\n    assert round(0.1 + 0.2, 9) == 0.3\n",
+                                                  encoding="utf-8")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "remove test_close")
+    monkeypatch.setattr(ctn, "REPO", tmp_path)
+    assert ctn.findings("twin", "HEAD") == [("tests/test_b.py", "test_close", 0, "removed")]
+
+
+def test_main_compares_a_pr_with_its_branch_point_when_the_base_moved_on(tmp_path, monkeypatch):
+    _repo(tmp_path)
+    _git(tmp_path, "checkout", "-q", "-b", "pr")
+    (tmp_path / "tests" / "test_b.py").write_text("def test_close():\n    pass\n", encoding="utf-8")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "narrow test_close")
+    _git(tmp_path, "checkout", "-q", "-b", "advance", "base")
+    (tmp_path / "tests" / "test_b.py").write_text(OTHER + "    assert 2\n", encoding="utf-8")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "base adds a check")
+    _git(tmp_path, "tag", "advanced")
+    _git(tmp_path, "checkout", "-q", "pr")
+    monkeypatch.setattr(ctn, "REPO", tmp_path)
+    assert ctn.findings("advanced", "pr") == [("tests/test_b.py", "test_close", 1, "fewer checks (1 -> 0)")]
+
+
+def test_a_test_the_base_branch_deleted_cannot_hide_a_removal(tmp_path, monkeypatch):
+    _repo(tmp_path)
+    twin = "def test_twin():\n    assert 0.1 + 0.2 == pytest.approx(0.3, rel=1e-9)\n"
+    (tmp_path / "tests" / "test_b.py").write_text(twin, encoding="utf-8")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "twin")
+    _git(tmp_path, "tag", "-f", "base")
+    _git(tmp_path, "checkout", "-q", "-b", "pr")
+    (tmp_path / "tests" / "test_a.py").write_text(
+        BASE.replace("def test_close():\n    assert 0.1 + 0.2 == pytest.approx(0.3, rel=1e-9)\n", ""), encoding="utf-8")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "remove test_close")
+    _git(tmp_path, "checkout", "-q", "-b", "advance", "base")
+    _git(tmp_path, "rm", "-q", "tests/test_b.py")
+    _git(tmp_path, "commit", "-q", "-m", "base deletes test_b")
+    _git(tmp_path, "tag", "advanced")
+    _git(tmp_path, "checkout", "-q", "pr")
+    monkeypatch.setattr(ctn, "REPO", tmp_path)
+    assert ctn.findings("advanced", "pr") == [("tests/test_a.py", "test_close", 0, "removed")]
