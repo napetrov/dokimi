@@ -50,9 +50,9 @@ Read the [development guide](README.md) for user outcomes, [interface migrations
 | [#558](https://github.com/intel/dokimi/pull/558) | Open PR | feat(catalog): not-a-skill-no-frontmatter, with a suggested frontmatter block |
 | [#559](https://github.com/intel/dokimi/pull/559) | Open PR | feat(catalog): bundle-file-unreferenced, bundled files SKILL.md never names |
 | [#588](https://github.com/intel/dokimi/pull/588) (merged) | Merged | feat(repo): repo security, unsafe agent behaviour per arm against the baseline (#360) |
-| [#589](https://github.com/intel/dokimi/pull/589) (merged) | Open PR | fix(eval): eval writers go through save_artifact (#277 R4) |
+| [#589](https://github.com/intel/dokimi/pull/589) (merged) | Merged | fix(eval): eval writers go through save_artifact (#277 R4) |
 | [#590](https://github.com/intel/dokimi/pull/590) (merged) | Merged | feat(cli): every --json leaf emits cli_output.v1 |
-| [#592](https://github.com/intel/dokimi/pull/592) (merged) | Open PR | fix(cli): exits 3, 4 and 5 per the §2.6 table; a crash exits 5 |
+| [#592](https://github.com/intel/dokimi/pull/592) (merged) | Merged | fix(cli): exits 3, 4 and 5 per the §2.6 table; a crash exits 5 |
 | [#593](https://github.com/intel/dokimi/pull/593) (merged) | Merged | feat(repo): scan without a manifest checks the rules and @ imports Claude Code loads |
 | [#594](https://github.com/intel/dokimi/pull/594) (merged) | Merged | feat(eval): eval graph builds the frozen need graph for eval coverage (#331) |
 | [#595](https://github.com/intel/dokimi/pull/595) (merged) | Merged | feat(cli): skill routing and catalog routing replace novelty routing (#94 M3) |
@@ -93,16 +93,16 @@ Read the [development guide](README.md) for user outcomes, [interface migrations
 | [#600](https://github.com/intel/dokimi/issues/600) (closed) | Closed issue | point_biserial with an inf total returns r nan with reason None |
 | [#601](https://github.com/intel/dokimi/issues/601) (closed) | Closed issue | point_biserial reads tiny totals as no variance because of the absolute floor of 1.0 in _is_degenerate |
 | [#602](https://github.com/intel/dokimi/issues/602) (closed) | Closed issue | fixtures_digest raises UnicodeEncodeError on a fixture whose file name is not UTF-8 |
-| [#604](https://github.com/intel/dokimi/pull/604) (merged) | Open PR | fix(evaluate): an unparseable --custom-questions file exits 2 |
+| [#604](https://github.com/intel/dokimi/pull/604) (merged) | Merged | fix(evaluate): an unparseable --custom-questions file exits 2 |
 | [#605](https://github.com/intel/dokimi/issues/605) (closed) | Closed issue | eval score reference: an empty, non-JSON or non-UTF-8 --answers or --questions file ends in a traceback, exit 1 |
-| [#606](https://github.com/intel/dokimi/pull/606) (merged) | Open PR | fix(repos): a ledger rule that cannot reach p < alpha stays out of the Holm family |
-| [#607](https://github.com/intel/dokimi/pull/607) (merged) | Open PR | fix(eval): parse_json(contains=True) stops on deeply nested input |
-| [#608](https://github.com/intel/dokimi/pull/608) (merged) | Open PR | fix(repo): a pinned source refuses a path that leaves the tree (#582) |
+| [#606](https://github.com/intel/dokimi/pull/606) (merged) | Merged | fix(repos): a ledger rule that cannot reach p < alpha stays out of the Holm family |
+| [#607](https://github.com/intel/dokimi/pull/607) (merged) | Merged | fix(eval): parse_json(contains=True) stops on deeply nested input |
+| [#608](https://github.com/intel/dokimi/pull/608) (merged) | Merged | fix(repo): a pinned source refuses a path that leaves the tree (#582) |
 | [#609](https://github.com/intel/dokimi/issues/609) (closed) | Closed issue | test: litellm 1.109.0 ReadOnly TypedDict notices fail the tag wheel tests |
-| [#610](https://github.com/intel/dokimi/pull/610) (merged) | Open PR | test: ignore pydantic's ReadOnly TypedDict notice for any class |
+| [#610](https://github.com/intel/dokimi/pull/610) (merged) | Merged | test: ignore pydantic's ReadOnly TypedDict notice for any class |
 | [#611](https://github.com/intel/dokimi/issues/611) (closed) | Closed issue | scorecard._digest_ref raises UnicodeEncodeError on a skill file whose name is not UTF-8 |
 | [#612](https://github.com/intel/dokimi/issues/612) (closed) | Closed issue | harbor_export._content_key raises UnicodeEncodeError on a task file whose name is not UTF-8 |
-| [#613](https://github.com/intel/dokimi/pull/613) (merged) | Open PR | fix: a git path or fixture name that is not UTF-8 no longer raises in schema_compat or fixtures_digest |
+| [#613](https://github.com/intel/dokimi/pull/613) (merged) | Merged | fix: a git path or fixture name that is not UTF-8 no longer raises in schema_compat or fixtures_digest |
 | [#614](https://github.com/intel/dokimi/issues/614) | Open issue | script scanner: count a case only at a command start |
 | [#619](https://github.com/intel/dokimi/issues/619) (closed) | Closed issue | parse_json(contains=True) costs starts x text length on a long text with many brackets |
 
@@ -119,18 +119,18 @@ Read the [development guide](README.md) for user outcomes, [interface migrations
 | [#383](https://github.com/intel/dokimi/issues/383) | Open issue | Drop the filelock override once a litellm release allows filelock 4 |
 | [#385](https://github.com/intel/dokimi/issues/385) | Open issue | ci: shared gh-ci scripts: reject non-Linux matrix cells, CRLF METADATA, matrix.py parsing |
 | [#430](https://github.com/intel/dokimi/issues/430) | Open issue | Drop the non-dict checks left by extract_json_object's dict-only return |
-| [#492](https://github.com/intel/dokimi/pull/492) (merged) | Open PR | ci(deps): update non-major dependencies |
-| [#568](https://github.com/intel/dokimi/pull/568) (merged) | Open PR | fix(records): four more answers/evaluations readers go through records.py |
-| [#574](https://github.com/intel/dokimi/pull/574) (merged) | Open PR | fix(eval): a result that cannot reach p < 0.05 stays out of Holm's multiplier |
-| [#615](https://github.com/intel/dokimi/pull/615) (merged) | Open PR | refactor(arms): CLI refusals take an ArmsRunConfig, not an argparse Namespace |
-| [#616](https://github.com/intel/dokimi/pull/616) (merged) | Open PR | refactor(repos): drop the unused container re-exports of three docker_cmd constants |
-| [#617](https://github.com/intel/dokimi/pull/617) (merged) | Open PR | refactor(repos): one module for the project-marker names |
-| [#618](https://github.com/intel/dokimi/pull/618) (merged) | Open PR | refactor(stats): one resampler and one sign-flip row for the novelty and arms intervals |
-| [#620](https://github.com/intel/dokimi/pull/620) (merged) | Open PR | refactor(novelty): parse the answer key's bundle record once |
-| [#621](https://github.com/intel/dokimi/pull/621) (merged) | Open PR | refactor(judge): one default-judge rule that takes the answerer into account |
-| [#622](https://github.com/intel/dokimi/pull/622) (merged) | Open PR | refactor(gate): one Check/Verdict type for every gate verdict |
+| [#492](https://github.com/intel/dokimi/pull/492) (merged) | Merged | ci(deps): update non-major dependencies |
+| [#568](https://github.com/intel/dokimi/pull/568) (merged) | Merged | fix(records): four more answers/evaluations readers go through records.py |
+| [#574](https://github.com/intel/dokimi/pull/574) (merged) | Merged | fix(eval): a result that cannot reach p < 0.05 stays out of Holm's multiplier |
+| [#615](https://github.com/intel/dokimi/pull/615) (merged) | Merged | refactor(arms): CLI refusals take an ArmsRunConfig, not an argparse Namespace |
+| [#616](https://github.com/intel/dokimi/pull/616) (merged) | Merged | refactor(repos): drop the unused container re-exports of three docker_cmd constants |
+| [#617](https://github.com/intel/dokimi/pull/617) (merged) | Merged | refactor(repos): one module for the project-marker names |
+| [#618](https://github.com/intel/dokimi/pull/618) (merged) | Merged | refactor(stats): one resampler and one sign-flip row for the novelty and arms intervals |
+| [#620](https://github.com/intel/dokimi/pull/620) (merged) | Merged | refactor(novelty): parse the answer key's bundle record once |
+| [#621](https://github.com/intel/dokimi/pull/621) (merged) | Merged | refactor(judge): one default-judge rule that takes the answerer into account |
+| [#622](https://github.com/intel/dokimi/pull/622) (merged) | Merged | refactor(gate): one Check/Verdict type for every gate verdict |
 | [#623](https://github.com/intel/dokimi/pull/623) | Open PR | refactor(docker): one run_spec builder for every docker run argv |
-| [#625](https://github.com/intel/dokimi/pull/625) (merged) | Open PR | refactor(novelty): role clients, spend cap and USD estimate move to novelty/cost.py |
+| [#625](https://github.com/intel/dokimi/pull/625) (merged) | Merged | refactor(novelty): role clients, spend cap and USD estimate move to novelty/cost.py |
 | [#627](https://github.com/intel/dokimi/pull/627) | Open PR | docs: organize Dokimi features into an illustrated guide |
 
 This index makes omissions visible; it is not a promise that all work will ship. Update this dated inventory when refreshing the development guide, and keep runnable command documentation tied to merged functionality.
