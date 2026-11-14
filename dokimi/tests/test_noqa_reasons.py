@@ -48,7 +48,7 @@ def _python_files() -> list[Path]:
         ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", "*.py"],
         cwd=ROOT, capture_output=True, text=True, check=True).stdout
     return [ROOT / rel for rel in sorted(listed.split("\0"))
-            if rel and not rel.startswith(SKIP)]
+            if rel and not rel.startswith(SKIP) and (ROOT / rel).is_file()]
 
 
 def test_python_files_follow_gitignore_and_skip_tox(tmp_path: Path, monkeypatch) -> None:
@@ -57,6 +57,9 @@ def test_python_files_follow_gitignore_and_skip_tox(tmp_path: Path, monkeypatch)
     for rel in ("a.py", "mutants/scratch.py", ".tox/py311/x.py", "pkg/b.py"):
         (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / rel).write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "gone.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "gone.py"], check=True)
+    (tmp_path / "gone.py").unlink()  # staged, then deleted in the working tree
     monkeypatch.setitem(globals(), "ROOT", tmp_path)
     assert [p.relative_to(tmp_path).as_posix() for p in _python_files()] == ["a.py", "pkg/b.py"]
 
