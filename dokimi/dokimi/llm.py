@@ -22,14 +22,13 @@ replies" loop, for any ``ask(prompt, draw=, cache_if=) -> str`` callable.
 
 What a caller can rely on:
 
-- **Providers.** :data:`PROVIDERS` (canonical name -> key variable) plus
-  :data:`PROVIDER_ALIASES`. :func:`resolve_model` is this module's model-name map and
-  :func:`credential_env_var` its key-variable map. A provider outside the table is
-  passed to litellm as its own route prefix (``azure/<model>``), reading
-  ``OPENAI_API_KEY``. A provider in :data:`dokimi.llm_cli.BACKENDS` (``claude-cli``)
-  is a logged-in coding-agent CLI, not an API: no key, no tools, no sampling
-  control (:mod:`dokimi.llm_cli`). An explicit ``api_key`` wins over the environment; either
-  may be ``file:<path>``, and an unreadable file raises ``ValueError``.
+- **Providers.** :data:`PROVIDERS` (canonical name -> key variable) plus :data:`PROVIDER_ALIASES`.
+  :func:`resolve_model` is this module's model-name map and :func:`credential_env_var` its
+  key-variable map. A provider outside the table is its own litellm route (``azure/<model>``),
+  sent no key: litellm reads the vendor's variable raw (``file:`` is not read). A provider in
+  :data:`dokimi.llm_cli.BACKENDS` (``claude-cli``) is a logged-in coding-agent CLI, not an API: no
+  key, no tools, no sampling control (:mod:`dokimi.llm_cli`). An explicit ``api_key`` wins over
+  the environment; either may be ``file:<path>``, and an unreadable file raises ``ValueError``.
 - **Bedrock bare names.** A name in :data:`dokimi.defaults.BEDROCK_MODEL_IDS`
   runs under its inference profile (:func:`dokimi.defaults.bedrock_profile`);
   ``openai.*`` models take the Converse route.
@@ -123,9 +122,9 @@ def _canonical(provider: str) -> str:
     return PROVIDER_ALIASES.get(provider, provider)
 
 
-def credential_env_var(provider: str) -> str:
-    """The environment variable holding *provider*'s key (``OPENAI_API_KEY`` off the table)."""
-    return PROVIDERS.get(_canonical(provider), "OPENAI_API_KEY")
+def credential_env_var(provider: str) -> Optional[str]:
+    """The environment variable holding *provider*'s key; ``None`` off the table (litellm reads it)."""
+    return PROVIDERS.get(_canonical(provider))
 
 
 def resolve_api_key(provider: str, api_key: Optional[str] = None) -> Optional[str]:
@@ -136,7 +135,8 @@ def resolve_api_key(provider: str, api_key: Optional[str] = None) -> Optional[st
     Raises:
         ValueError: a ``file:`` key is unreadable.
     """
-    key = "" if llm_cli.backend(provider) else (api_key or os.environ.get(credential_env_var(provider), ""))
+    var = credential_env_var(provider)  # None for a CLI backend too
+    key = "" if llm_cli.backend(provider) else (api_key or (os.environ.get(var, "") if var else ""))
     if key.startswith("file:"):
         path = os.path.expanduser(key[len("file:"):])
         try:
@@ -145,6 +145,13 @@ def resolve_api_key(provider: str, api_key: Optional[str] = None) -> Optional[st
         except (OSError, UnicodeDecodeError) as exc:
             raise ValueError(f"Cannot read API key from file '{path}': {exc}") from exc
     return key or None
+
+
+def _litellm() -> Any:
+    """litellm, with its banners off: printed to stdout on a failed call, they break ``--json`` output."""
+    import litellm
+    litellm.suppress_debug_info = True
+    return litellm
 
 
 def resolve_model(model: str, provider: str) -> str:
@@ -160,7 +167,7 @@ def resolve_model(model: str, provider: str) -> str:
         return f"openai/{model}"
     if name == "openai":
         # A name litellm does not take for OpenAI's (glm-5.3, meta-llama/x, claude-*) gets openai/.
-        import litellm
+        litellm = _litellm()
         known = litellm.open_ai_chat_completion_models | litellm.open_ai_text_completion_models
         ours = model in known or "ft:gpt-3.5-turbo" in model or "ft:gpt-4" in model  # as litellm
         routed = (p := model.split("/", 1)[0]) in litellm.provider_list or litellm.JSONProviderRegistry.exists(p) if "/" in model else ours
@@ -220,9 +227,7 @@ def unsupported_sampling_params(
     if (cli := llm_cli.backend(_canonical(provider))) is not None:
         return [n for n in requested if n not in cli.supports]
     try:
-        from litellm import get_supported_openai_params
-
-        supported = get_supported_openai_params(model=resolve_model(model, provider)) or []
+        supported = _litellm().get_supported_openai_params(model=resolve_model(model, provider)) or []
     except Exception:
         return []
     if not supported:
@@ -310,16 +315,14 @@ _COST_UNKNOWN_LOGGED: set = set()
 def _has_price_entry(litellm_model: str, model: str) -> bool:
     """Whether litellm's price map has an entry for the routed name, the name without its
     route prefixes (``bedrock/converse/openai.x`` -> ``openai.x``) or the bare model name."""
-    from litellm import model_cost
-
+    model_cost = _litellm().model_cost
     candidates = {litellm_model, model, *litellm_model.split("/", 1)[1:],
                   litellm_model.rsplit("/", 1)[-1]}
     return any(c in model_cost for c in candidates)
 
 
 def cost_per_token(**kwargs: Any) -> tuple[float, float]:  # litellm's, for llm_pricing
-    from litellm import cost_per_token as price
-    return price(**kwargs)
+    return _litellm().cost_per_token(**kwargs)
 
 
 def _safe_completion_cost(resp: Any, model: str, litellm_model: Optional[str] = None) -> Optional[float]:
@@ -336,12 +339,10 @@ def _safe_completion_cost(resp: Any, model: str, litellm_model: Optional[str] = 
     makes ``completion_cost`` fail with "LLM Provider NOT provided" → null cost.
     """
     try:
-        from litellm import completion_cost
-
         kwargs: Dict[str, Any] = {"completion_response": resp}
         if litellm_model:
             kwargs["model"] = litellm_model
-        cost = completion_cost(**kwargs)
+        cost = _litellm().completion_cost(**kwargs)
         if cost is None:
             raise ValueError("completion_cost returned None")
         cost = float(cost)
@@ -564,8 +565,7 @@ class LiteLLMAdapter:
     def __call__(self, request: Request) -> Reply:
         if llm_cli.backend(request.provider) is not None:
             return _cli_reply(request)
-        from litellm import completion
-
+        completion = _litellm().completion
         if request.stream:
             return _stream(completion, request)
         kwargs = _sampling_kwargs(max_tokens=request.max_tokens,

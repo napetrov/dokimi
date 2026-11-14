@@ -64,6 +64,7 @@ import statistics
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from dokimi.eval.finite_delta import check_sum_range, checked_delta
 from dokimi.eval.sign_flip import ALPHA, EPS, METHOD, min_sign_flip_p, round_mean, sign_flip_row, within
 from dokimi.records import BASELINE, CONTEXT, RecordLike, records
 
@@ -84,10 +85,6 @@ CORRECTIONS = ("holm", "bh")
 #: Relative spread (scaled by the mean) below which d_z is undefined: a float constant shift has sd ~ 3e-15,
 #: not 0, and d_z ~ 2.8e13 ("large"). The sign-flip p needs no such guard.
 ZERO_VARIANCE_REL_TOL = 1e-9
-
-
-#: Totals above this are scaled by a power of two before ``point_biserial`` sums them (a sum of 2**900 needs 2**124 of them to overflow).
-_HUGE_TOTAL = 2.0 ** 900
 
 
 def _is_degenerate(mean: float, sd: float) -> bool:
@@ -163,12 +160,17 @@ def bootstrap_ci(
     if n == 1:
         return {"mean": _rnd(vals[0], ndigits), "lo": _rnd(vals[0], ndigits), "hi": _rnd(vals[0], ndigits), "n": 1}
 
-    means = bootstrap_statistics(
-        n, lambda picked: sum(vals[i] for i in picked) / n, n_resamples=n_resamples, seed=seed,
-    )
+    finite = all(math.isfinite(v) for v in vals)
+
+    def resample_mean(picked: List[int]) -> float:
+        mean = sum(vals[i] for i in picked) / n
+        # A sum that leaves the float range is not a mean that does: https://github.com/intel/dokimi/issues/598
+        return _mean([vals[i] for i in picked]) if finite and not math.isfinite(mean) else mean
+
+    means = bootstrap_statistics(n, resample_mean, n_resamples=n_resamples, seed=seed)
     lo, hi = percentile_bounds(means, confidence)
     return {
-        "mean": _rnd(sum(vals) / n, ndigits),
+        "mean": _rnd(_mean(vals), ndigits),
         "lo": _rnd(lo, ndigits),
         "hi": _rnd(hi, ndigits),
         "n": n,
@@ -394,6 +396,14 @@ def _wilson(p: float, n: int, z: float = _Z95) -> Tuple[float, float]:
     return (max(0.0, min(p, centre - half)), min(1.0, max(p, centre + half)))
 
 
+def _deltas(treatment: Sequence[float], control: Sequence[float]) -> List[float]:
+    """``treatment - control`` pair by pair; finite inputs whose difference leaves the float range raise.
+
+    A NaN or inf in the input keeps its meaning in the delta: https://github.com/intel/dokimi/issues/599
+    """
+    return [checked_delta(t, c) for t, c in zip(treatment, control, strict=True)]
+
+
 def paired_vectors(
     evaluations: Iterable[RecordLike], arm_a: str, arm_b: str
 ) -> Tuple[List[float], List[float]]:
@@ -420,7 +430,7 @@ def paired_delta(evaluations: Iterable[Any], baseline_arm: str, arm_name: str) -
     difference of two unpaired means would compare different questions.
     """
     arm_vals, base_vals = paired_vectors(evaluations, arm_name, baseline_arm)
-    diffs = [a - b for a, b in zip(arm_vals, base_vals, strict=True)]
+    diffs = _deltas(arm_vals, base_vals)
     return round(sum(diffs) / len(diffs), 1) if diffs else None
 
 
@@ -461,7 +471,7 @@ def paired_summary(evaluations: Iterable[RecordLike]) -> PairedSummary:
     """
     recs = records(evaluations, source="evaluations", kind="evaluations")
     with_s, without_s = paired_vectors(recs, CONTEXT, BASELINE)
-    deltas = [w - wo for w, wo in zip(with_s, without_s, strict=True)]
+    deltas = _deltas(with_s, without_s)
     paired = len(deltas)
     return PairedSummary(
         total=len(recs),
@@ -498,7 +508,8 @@ def point_biserial(flags: Sequence[bool], totals: Sequence[float]) -> Dict[str, 
     Returns:
         ``{"r": float | None, "n": int, "n_pass": int, "reason": str | None}``. ``r`` is
         ``None`` when it is undefined: fewer than three respondents, no variance in the
-        totals, or an item every respondent passed or failed. ``reason`` names which.
+        totals, a total that is not finite, or an item every respondent passed or failed.
+        ``reason`` names which.
     """
     if len(flags) != len(totals):
         raise ValueError(
@@ -513,9 +524,12 @@ def point_biserial(flags: Sequence[bool], totals: Sequence[float]) -> Dict[str, 
     if n_pass in (0, n):
         return {"r": None, "n": n, "n_pass": n_pass,
                 "reason": "no variance in the item: every respondent scored it the same"}
+    if not all(math.isfinite(t) for _, t in pairs):
+        return {"r": None, "n": n, "n_pass": n_pass, "reason": "a total is not finite"}
     top = max(abs(t) for _, t in pairs)
-    # Totals this large would overflow a sum or a difference; r does not depend on the scale: https://github.com/intel/dokimi/issues/553
-    scale = _pow2_scale([top]) if math.isfinite(top) and top > _HUGE_TOTAL else 1.0
+    # r does not depend on the scale. Large totals would overflow a sum (#553); small ones fall under the floor of 1.0
+    # in _is_degenerate and read as no variance (#601). Dividing by a power of two is exact.
+    scale = _pow2_scale([top]) if top > 0 else 1.0
     pairs = [(flag, t / scale) for flag, t in pairs]
     all_totals = [t for _, t in pairs]
     sd = _sample_sd(all_totals)
@@ -577,9 +591,9 @@ def _describe_deltas(
     d_sd = _sample_sd(d)
     cohens_d = _cohens_d(d_mean, d_sd)
     if all(math.isfinite(x) for x in d):
-        if not (math.isfinite(d_sd) and math.isfinite(sum(abs(x) for x in d))):
-            # The sign-flip sums would overflow and read as a measured zero effect.
-            raise OverflowError("deltas too large: their spread or sum leaves the float range")
+        # The sign-flip sums would overflow and read as a measured zero effect.
+        # A finite sum of magnitudes bounds the spread (sd**2 <= sum(x**2) <= that sum squared), so it is finite too.
+        check_sum_range(d)
         row = sign_flip_row(d, seed=seed, exact=True)
         p, lo, hi, shown_lo, shown_hi = row["p"], row["lo"], row["hi"], row["ci_lo"], row["ci_hi"]
     else:  # a NaN delta is no evidence either way: no p, no verdict, open ends
@@ -635,7 +649,7 @@ def paired_test(
     """
     if len(treatment) != len(control) or len(treatment) < 2:
         return None
-    deltas = [t - c for t, c in zip(treatment, control, strict=True)]
+    deltas = _deltas(treatment, control)
     result = _describe_deltas(deltas, confidence=confidence, seed=seed)
     return _finalize(result) if rounded else result
 
@@ -675,7 +689,7 @@ def arm_significance(
         # raw p-values, and paired_test rounds on the way out.
         if len(treat) == len(base) and len(treat) >= 2:
             out[arm] = _describe_deltas(
-                [t - c for t, c in zip(treat, base, strict=True)],
+                _deltas(treat, base),
                 confidence=confidence,
                 seed=seed,
             )
