@@ -377,7 +377,7 @@ def _opens_frontmatter(lines: list[str]) -> bool:
     block: list[str] = []
     for line in lines[1:]:
         if line.rstrip() == "---":
-            return not block or any(YAML_KEY_RE.match(line) for line in block)
+            return not any(line.strip() for line in block) or any(YAML_KEY_RE.match(line) for line in block)
         block.append(line)
     first = next((line for line in block if line.strip()), "")
     return bool(YAML_KEY_RE.match(first))  # unclosed: a later ``Usage:`` line is prose, not a key

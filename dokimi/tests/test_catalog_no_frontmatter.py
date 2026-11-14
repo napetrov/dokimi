@@ -201,6 +201,8 @@ def test_a_rule_then_prose_is_plain_markdown(tmp_path, text):
         "---\n- name: deck\n---\n# Deck\n",  # a list, not a mapping
         "---\nname: deck\ndescription: Use when decks.\n\n# Deck\n",  # no closing ---
         "---\n---\nname: deck\ndescription: Use when decks.\n---\n# Deck\n",  # an empty block first
+        "---\n\n---\n# Deck\n\nBuilds decks.\n",  # an empty block with a blank line in it
+        "---\n   \n---\n# Deck\n\nBuilds decks.\n",  # an empty block with a whitespace line in it
     ],
 )
 def test_a_frontmatter_block_without_name_or_description_is_a_broken_skill_not_plain_markdown(tmp_path, text):
@@ -272,3 +274,4 @@ def test_an_empty_file_or_a_bom_before_frontmatter_is_not_plain_markdown(tmp_pat
     _plain(tmp_path, "odd", text)
     codes = [f.code for r in review_skills(read_skill_manifest(tmp_path)) if r for f in r.findings]
     assert "not-a-skill-no-frontmatter" not in codes
+
