@@ -278,3 +278,92 @@ def test_a_mutant_that_times_out_leaves_no_process_of_its_tests_behind(tmp_path:
     finally:
         if _alive(pid):
             os.kill(pid, signal.SIGKILL)
+
+
+def test_candidate_tests_match_a_wrapped_from_import(tmp_path: Path) -> None:
+    (tmp_path / "test_a.py").write_text("from dokimi.subjects import (\n    other,\n    scorecard,\n)\n", encoding="utf-8")
+    (tmp_path / "test_b.py").write_text("from dokimi.subjects import \\\n    scorecard\n", encoding="utf-8")
+    assert mc.candidate_tests(["dokimi/dokimi/subjects/scorecard.py"], tmp_path) == ["tests/test_a.py", "tests/test_b.py"]
+
+
+def test_changed_lines_counts_an_uncommitted_edit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    pkg = tmp_path / "dokimi" / "dokimi"
+    pkg.mkdir(parents=True)
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.email", "t@example.com")
+    _git(tmp_path, "config", "user.name", "t")
+    (pkg / "m.py").write_text("a = 1\nb = 2\n", encoding="utf-8")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "base")
+    (pkg / "m.py").write_text("a = 1\nb = 5\n", encoding="utf-8")
+    _git(tmp_path, "commit", "-qam", "head")
+    (pkg / "m.py").write_text("a = 1\nb = 5\nc = 6\n", encoding="utf-8")
+    monkeypatch.setattr(mc, "REPO", tmp_path)
+    assert mc.changed_lines("HEAD~1") == {"dokimi/dokimi/m.py": {2, 3}}
+
+
+def test_covering_tests_maps_an_import_time_line_to_the_file_tests(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("pytest_cov")
+    monkeypatch.delenv("PYTHONSAFEPATH", raising=False)
+    pkg = tmp_path / "dokimi" / "dokimi"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text("", encoding="utf-8")
+    (pkg / "zz.py").write_text("FLAG = True\n\n\ndef f(x=3):\n    return FLAG\n", encoding="utf-8")
+    (tmp_path / "dokimi" / "tests").mkdir()
+    (tmp_path / "dokimi" / "tests" / "test_zz.py").write_text(
+        "from dokimi.zz import f\n\n\ndef test_f():\n    assert f()\n", encoding="utf-8")
+    by_file, failing, not_run = mc.covering_tests(tmp_path, ["tests/test_zz.py"], ["dokimi/dokimi/zz.py"], 120)
+    assert (failing, not_run) == ([], [])
+    assert by_file == {"dokimi/dokimi/zz.py": {1: ["tests/test_zz.py"], 4: ["tests/test_zz.py"], 5: ["tests/test_zz.py::test_f"]}}
+
+
+@pytest.mark.parametrize("tests, cover", [
+    ("from dokimi.zz import a\n\n\ndef test_a():\n    assert a(1) is True\n", {2: ["tests/test_zz.py::test_missing"]}),
+    ("from dokimi.zz import a\n", {2: ["tests/test_zz.py"]}),
+], ids=["node-id-not-found", "nothing-collected"])
+def test_a_mutant_no_test_runs_for_is_an_error_not_a_kill(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, tests: str, cover: dict[int, list[str]]
+) -> None:
+    rc, report = _mutation_run(tmp_path, monkeypatch, "def a(x):\n    return x == 1\n", tests, cover, "--fail-on-survivor")
+    assert rc == 0
+    assert report["mutants"] and {m["status"] for m in report["mutants"]} == {"error"}
+
+
+def test_a_mutant_is_restored_to_the_source_after_its_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    writes: list[tuple[str, str]] = []
+    real = mc._write_source
+
+    def spy(target: Path, text: str) -> None:
+        writes.append((target.name, text))
+        real(target, text)
+
+    monkeypatch.setattr(mc, "_write_source", spy)
+    src = "def a(x):\n    return x == 1\n"
+    tests = "from dokimi.zz import a\n\n\ndef test_a():\n    assert a(1) is True\n"
+    _mutation_run(tmp_path, monkeypatch, src, tests, {2: ["tests/test_zz.py::test_a"]}, "--max-mutants", "1")
+    assert len(writes) == 2 and writes[-1] == ("zz.py", src)
+
+
+def test_fail_on_survivor_passes_when_every_mutant_is_killed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    tests = "from dokimi.zz import a\n\n\ndef test_a():\n    assert a(1) is True\n    assert a(2) is False\n"
+    rc, report = _mutation_run(tmp_path, monkeypatch, "def a(x):\n    return x == 1\n", tests,
+                               {2: ["tests/test_zz.py::test_a"]}, "--fail-on-survivor")
+    assert rc == 0
+    assert report["mutants"] and {m["status"] for m in report["mutants"]} == {"killed"}
+
+
+def test_a_survivor_is_a_warning_unless_fail_on_survivor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    src = "def b(x):\n    return x == 2\n"
+    tests = "from dokimi.zz import b\n\n\ndef test_b_is_only_called():\n    b(2)\n"
+    cover = {2: ["tests/test_zz.py::test_b_is_only_called"]}
+    _mutation_run(tmp_path, monkeypatch, src, tests, cover)
+    out = capsys.readouterr().out
+    assert "::warning file=dokimi/dokimi/zz.py,line=2::mutant survived" in out and "::error" not in out
+    _mutation_run(tmp_path, monkeypatch, src, tests, cover, "--fail-on-survivor")
+    out = capsys.readouterr().out
+    assert "::error file=dokimi/dokimi/zz.py,line=2::mutant survived" in out
+
+
+def test_no_mutable_changed_line_exits_clean(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(mc, "changed_lines", lambda base: {})
+    assert mc.main(["--base", "HEAD", "--fail-on-survivor"]) == 0

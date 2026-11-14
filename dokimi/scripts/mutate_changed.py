@@ -20,7 +20,9 @@ breaking. Steps:
    At most ``--max-mutants``, spread round-robin over the changed lines.
 5. Each mutant runs the tests covering its line, ``-x``, in a copy of the
    tracked tree (subprocess tests see the mutant too; the checkout is never
-   written). Exit 0 from pytest is a survivor; any failure kills it.
+   written). Exit 0 from pytest is a survivor, exit 1 (a test failed) a kill;
+   a timeout and any other exit code (no test ran, a usage error) get their own
+   status, never a kill.
 
 A line no candidate test executes is reported as uncovered, not mutated: the
 changed-lines coverage gate in ``ci.yml`` owns that. The run stops starting
@@ -79,14 +81,21 @@ class Mutant:
     seconds: float = 0.0
 
 
-def changed_lines(base: str, head: str = "HEAD") -> dict[str, set[int]]:
-    """Added or edited line numbers (in ``head``) per changed package file."""
+def changed_lines(base: str) -> dict[str, set[int]]:
+    """Added or edited line numbers per changed package file, the working tree against the merge base of ``base``.
+
+    Committed and uncommitted edits of tracked files count, as the mutants are cut from the working tree
+    (untracked files do not: CI checks out a clean tree).
+    """
+    mb = subprocess.run(["git", "merge-base", base, "HEAD"], cwd=REPO, capture_output=True, text=True, encoding="utf-8")
+    if mb.returncode:
+        raise SystemExit(f"git diff {base}...HEAD failed: {mb.stderr.strip()}")
     out = subprocess.run(
-        ["git", "diff", "-U0", "--no-color", "--diff-filter=AMR", f"{base}...{head}", "--", f"{PKG}*.py"],
+        ["git", "diff", "-U0", "--no-color", "--diff-filter=AMR", mb.stdout.strip(), "--", f"{PKG}*.py"],
         cwd=REPO, capture_output=True, text=True, encoding="utf-8",
     )
     if out.returncode:
-        raise SystemExit(f"git diff {base}...{head} failed: {out.stderr.strip()}")
+        raise SystemExit(f"git diff {base}...HEAD failed: {out.stderr.strip()}")
     result: dict[str, set[int]] = {}
     path = None
     for line in out.stdout.splitlines():
@@ -200,20 +209,28 @@ def candidate_tests(paths: list[str], tests_dir: Path) -> list[str]:
     Files named after a changed module (``test_b*.py``) come first: the coverage pass
     runs them in this order and stops at its share of the budget.
     """
-    patterns, leaves = [], []
+    specs, leaves = [], []
     for p in paths:
         dotted = p[len("dokimi/"):-len(".py")].replace("/", ".").removesuffix(".__init__")
         parent, _, leaf = dotted.rpartition(".")
         leaves.append(f"test_{leaf}")
-        patterns.append(re.compile(
-            rf"\b{re.escape(dotted)}\b|from\s+{re.escape(parent)}\s+import\s+[^\n]*\b{re.escape(leaf)}\b"
-        ))
+        specs.append((re.compile(rf"\b{re.escape(dotted)}\b"), parent, leaf))
     found = []
     for f in sorted(tests_dir.glob("test_*.py")):
         text = f.read_text(encoding="utf-8", errors="replace")
-        if any(p.search(text) for p in patterns):
+        froms = _from_imports(text)
+        if any(p.search(text) or (parent, leaf) in froms for p, parent, leaf in specs):
             found.append(f"tests/{f.name}")
     return sorted(found, key=lambda t: not any(Path(t).stem.startswith(leaf) for leaf in leaves))
+
+
+def _from_imports(text: str) -> set[tuple[str, str]]:
+    """(module, name) of each ``from module import name``, however the statement is wrapped; none if it does not parse."""
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return set()
+    return {(n.module, a.name) for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module for a in n.names}
 
 
 def _write_source(target: Path, text: str) -> None:
@@ -289,7 +306,10 @@ def covering_tests(
                 continue
             lines = by_file.setdefault(rel, {})
             for ln, cs in data.contexts_by_lineno(f).items():
-                if ids := {c.rsplit("|", 1)[0] for c in cs if c} - bad:
+                ids = {c.rsplit("|", 1)[0] for c in cs if c}
+                if "" in cs and not bad:  # run at collection (an import-time constant or default): the file's tests run it
+                    ids.add(test)
+                if ids := ids - bad:
                     lines[ln] = sorted(set(lines.get(ln, [])) | ids)
     return by_file, failing, []
 
@@ -345,7 +365,8 @@ def run(args: argparse.Namespace) -> int:
             finally:
                 _write_source(target, original)
             m.seconds = round(time.monotonic() - start, 1)
-            m.status = "survived" if rc == 0 else "timeout" if rc == -1 else "killed"
+            # 1 is a failed test. 2-5 (interrupted, internal, usage, nothing collected) say nothing about the mutant.
+            m.status = "survived" if rc == 0 else "timeout" if rc == -1 else "killed" if rc == 1 else "error"
         report["mutants"] = [asdict(m) for m in chosen]
     report["uncovered_lines"] = {p: sorted(s) for p, s in report["uncovered_lines"].items()}
     survived = sum(m.status == "survived" for m in chosen)
@@ -354,14 +375,14 @@ def run(args: argparse.Namespace) -> int:
 
 def markdown(report: dict) -> str:
     ms = report["mutants"]
-    count = {s: sum(m["status"] == s for m in ms) for s in ("killed", "timeout", "survived", "not run")}
+    count = {s: sum(m["status"] == s for m in ms) for s in ("killed", "timeout", "error", "survived", "not run")}
     out = ["## Mutation of changed lines\n"]
     if note := report.get("note"):
         out.append(f"{note}.\n")
     out.append(
         f"{len(ms)} mutants of {report.get('mutants_covered', 0)} on covered changed lines (cap {report['max_mutants']}): "
-        f"{count['killed']} killed, {count['timeout']} timed out, **{count['survived']} survived**, "
-        f"{count['not run']} not run (time budget). {report['seconds']} s.\n"
+        f"{count['killed']} killed, {count['timeout']} timed out, {count['error']} errors, "
+        f"**{count['survived']} survived**, {count['not run']} not run (time budget). {report['seconds']} s.\n"
     )
     survivors = [m for m in ms if m["status"] == "survived"]
     if survivors:
@@ -405,7 +426,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--base", required=True, help="git ref the PR is diffed against (merge base of BASE...HEAD)")
     ap.add_argument("--max-mutants", type=int, default=40)
-    ap.add_argument("--mutant-timeout", type=float, default=180.0, help="seconds per mutant; a timeout counts as killed")
+    ap.add_argument("--mutant-timeout", type=float, default=180.0, help="seconds per mutant; a mutant that times out is reported as timed out, neither killed nor survived")
     ap.add_argument("--budget", type=float, default=1200.0, help="seconds after which no new mutant starts")
     ap.add_argument("--json")
     ap.add_argument("--markdown")
