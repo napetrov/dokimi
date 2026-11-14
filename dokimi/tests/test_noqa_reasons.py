@@ -25,6 +25,8 @@ CODES = {"BLE001", "S110", "S112"}
 SKIP = ("benchmarks/", "data/", "tests/fixtures/task_formats/", ".venv/", "venv/", "build/", ".tox/", "dist/")
 _NOQA = re.compile(r"#\s*(?:(?:ruff|flake8)\s*:\s*)?noqa:\s*(?P<codes>[A-Z]+[0-9]+(?:[\s,]+[A-Z]+[0-9]+)*)(?P<rest>.*)$", re.I)
 _REASON = re.compile(r"^\s*(?:[-—:(]+\s*)?(?P<text>.*?)\)?\s*$")
+# coverage.py's default exclude pattern: the pragma must start with a `#` of its own.
+_COVERAGE_PRAGMA = re.compile(r"#\s*(pragma|PRAGMA)[:\s]?\s*(no|NO)\s*(cover|COVER)")
 
 
 def unexplained(source: str) -> list[int]:
@@ -36,7 +38,7 @@ def unexplained(source: str) -> list[int]:
         m = _NOQA.search(tok.string)
         if not m or not CODES & set(re.split(r"[\s,]+", m.group("codes"))):
             continue
-        reason = _REASON.match(m.group("rest"))
+        reason = _REASON.match(_COVERAGE_PRAGMA.sub("", m.group("rest")))
         if not reason or len(reason.group("text").split()) < 2:
             lines.append(tok.start[0])
     return lines
@@ -100,15 +102,17 @@ def test_a_code_after_a_space_separated_one_is_still_checked() -> None:
     assert unexplained("try:\n    x()\nexcept:  # noqa: E722 BLE001 S110 - logged by the caller\n    pass\n") == []
 
 
+def test_a_coverage_pragma_is_not_a_reason() -> None:
+    src = "try:\n    x()\nexcept Exception:  # noqa: BLE001, S110 # pragma: no cover\n    pass\n"
+    assert unexplained(src) == [3]
+    assert unexplained(src.replace("# pragma: no cover", "# pragma: no cover - logged upstream")) == []
+
+
 def test_a_file_level_noqa_needs_a_reason_too() -> None:
     src = "try:\n    x()\nexcept Exception:\n    pass\n"
     assert unexplained("# ruff: noqa: BLE001, S110\n" + src) == [1]
     assert unexplained("# flake8: noqa: BLE001\n" + src) == [1]
     assert unexplained("# ruff: noqa: BLE001 - every probe failure is logged upstream\n" + src) == []
-
-
-# coverage.py's default exclude pattern: the pragma must start with a `#` of its own.
-_COVERAGE_PRAGMA = re.compile(r"#\s*(pragma|PRAGMA)[:\s]?\s*(no|NO)\s*(cover|COVER)")
 
 
 def test_a_reason_does_not_hide_a_coverage_pragma() -> None:
