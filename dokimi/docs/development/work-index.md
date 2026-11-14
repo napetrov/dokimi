@@ -39,7 +39,7 @@ Read the [development guide](README.md) for user outcomes, [interface migrations
 | [#413](https://github.com/intel/dokimi/issues/413) | Open issue | Corpus-scale scan gaps (catalog scan, novelty accuracy) |
 | [#424](https://github.com/intel/dokimi/issues/424) | Open issue | catalog granularity: decide whether skills should be split, merged, or regrouped (static check + paid partition eval) |
 | [#441](https://github.com/intel/dokimi/pull/441) | Merged | feat(eval): skill coverage — uncovered skill items as candidate checks (#220 A5) |
-| [#454](https://github.com/intel/dokimi/pull/454) | Open PR | fix(validate): read the when cue of each language in description-no-when |
+| [#454](https://github.com/intel/dokimi/pull/454) | Merged | fix(validate): read the when cue of each language in description-no-when |
 | [#455](https://github.com/intel/dokimi/pull/455) | Merged | feat(catalog): check the scripts a skill bundles |
 | [#459](https://github.com/intel/dokimi/pull/459) | Merged | feat(catalog): catalog check --online reports missing packages and dead links |
 | [#472](https://github.com/intel/dokimi/pull/472) | Merged | novelty: program checks on probes (identifiers veto) + grading-ladder design note |
