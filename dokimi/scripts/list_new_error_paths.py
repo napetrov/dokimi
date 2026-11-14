@@ -24,7 +24,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 _HUNK = re.compile(r"^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 _KINDS = (
-    ("raise", re.compile(r"(?:^|:)\s*raise\b")),
+    ("raise", re.compile(r"(?:^|[:;])\s*raise\b")),
     ("exit", re.compile(r"\bsys\.exit\s*\(|\bSystemExit\s*\(|\bexit_code\s*=\s*[1-9]")),
     ("test", re.compile(r"^\s*(?:async\s+)?def\s+test_\w*\s*\(")),
 )

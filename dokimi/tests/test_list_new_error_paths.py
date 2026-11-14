@@ -81,6 +81,11 @@ def test_a_path_with_spaces_keeps_its_sites():
     assert lnep.added_sites(diff) == [("my x.py", 1, "raise", "raise Z")]
 
 
+def test_a_raise_after_a_semicolon_on_the_same_line_is_listed():
+    diff = "--- a/x.py\n+++ b/x.py\n@@ -0,0 +1 @@\n+cleanup(); raise ValueError('bad')\n"
+    assert lnep.added_sites(diff) == [("x.py", 1, "raise", "cleanup(); raise ValueError('bad')")]
+
+
 def test_a_context_row_inside_a_fused_hunk_is_counted():
     diff = "--- a/x.py\n+++ b/x.py\n@@ -1,3 +1,3 @@\n-raise OldA\n+raise NewA\n unchanged()\n-raise OldB\n+raise NewB\n"
     assert lnep.added_sites(diff) == [("x.py", 1, "raise", "raise NewA"), ("x.py", 3, "raise", "raise NewB")]
