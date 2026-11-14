@@ -222,3 +222,36 @@ def test_empty_frontmatter_stops_at_its_own_closing_line(mem):
     (mem / "a.md").write_text("---\n---\nSaw it today.\n\n---\nname: later\n---\n")
     found = [(f.rule, f.line) for f in lint(read_claude_memory(mem)) if f.file == "a.md"]
     assert ("relative-date", 3) in found and ("frontmatter-invalid", 1) not in found
+
+
+def test_escaped_parentheses_and_null_byte_targets(mem):
+    (mem / "topic(v2).md").write_text(_entry("t"))
+    (mem / "MEMORY.md").write_text("- [A](a.md) [B](b.md) [T](topic\\(v2\\).md)\n- [N](x%00.md)\n")
+    found = [(f.rule, f.line) for f in lint(read_claude_memory(mem))]
+    assert found == [("index-dead-link", 2)]
+
+
+def test_code_spans_and_comments_hide_links_by_the_backtick_run_length(mem):
+    (mem / "MEMORY.md").write_text("- [A](a.md) [B](b.md)\n``Use `x` and [example](missing.md)``\n"
+                                   "`<!--` [Gone](gone.md) `-->`\n")
+    dead = [(f.rule, f.line) for f in lint(read_claude_memory(mem))]
+    assert dead == [("index-dead-link", 3)]
+
+
+def test_relative_date_skips_fences_and_comments(mem):
+    (mem / "a.md").write_text(_entry("a", body="```\nrun it tomorrow\n```\n<!-- today -->\nDo it tomorrow."))
+    assert [f.line for f in lint(read_claude_memory(mem)) if f.rule == "relative-date"] == [11]
+
+
+def test_outside_link_fails_urls_are_skipped_and_byte_limit_edge(mem):
+    (mem / "MEMORY.md").write_text("- [A](a.md) [B](b.md) [U](https://example.com/x.md) [Up](../x.md)\n")
+    assert [(f.rule, f.severity) for f in lint(read_claude_memory(mem))] == [("index-dead-link", "fail")]
+    (mem / "MEMORY.md").write_text("- [A](a.md) [B](b.md)\n")
+    size = (mem / "MEMORY.md").stat().st_size
+    assert "index-over-limit" not in [r[0] for r in _rules(mem, max_bytes=size)]
+    assert ("index-over-limit", "fail", "MEMORY.md") in _rules(mem, max_bytes=size - 1)
+
+
+def test_comment_opener_in_a_fence_does_not_hide_the_prose_after_it(mem):
+    (mem / "a.md").write_text(_entry("a", body="```html\n<!--\n```\nDo it tomorrow.\n<!-- end -->"))
+    assert [f.line for f in lint(read_claude_memory(mem)) if f.rule == "relative-date"] == [10]

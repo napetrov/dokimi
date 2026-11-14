@@ -23,8 +23,9 @@ _FRONTMATTER = re.compile(r"\A---[ \t]*\r?\n(?:(.*?)\r?\n)??---[ \t]*(?:\r?\n|\Z
 _MD_LINK = re.compile(r"\]\(\s*(<[^>\n]+>|(?:[^()\s]|\([^()\s]*\))+)(?:\s+(?:\"[^\"]*\"|'[^']*'))?\s*\)")
 _MD_REF_DEF = re.compile(r"^ {0,3}\[(?!\^)[^\]\n]+\]:[ \t]*(<[^>\n]+>|\S+)")
 _WIKILINK = re.compile(r"\[\[([^\]\n]+)\]\]")
-_CODE_SPAN = re.compile(r"`[^`\n]*`")
-_HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
+#: A code span (a backtick run closed by a run of the same length, on one line) or an HTML comment, whichever starts first.
+_HIDDEN = re.compile(r"(?<!`)(`+)(?!`)[^\n]*?(?<!`)\1(?!`)|<!--.*?-->", re.S)
+_ESCAPE = re.compile(r"\\([!-/:-@\[-`{-~])")
 _FENCE = re.compile(r" {0,3}(`{3,}|~{3,})")
 
 
@@ -88,7 +89,7 @@ class MemoryStore:
         out = []
         for n, line in enumerate(prose_lines(self.index.text), 1):
             for m in [*_MD_LINK.finditer(line), *_MD_REF_DEF.finditer(line)]:
-                target = unquote(m.group(1).strip("<>").split("#", 1)[0])
+                target = unquote(_ESCAPE.sub(r"\1", m.group(1).strip("<>")).split("#", 1)[0])
                 if target and "://" not in target and not target.startswith("mailto:"):
                     out.append((n, target))
         return out
@@ -96,20 +97,33 @@ class MemoryStore:
 
 def prose_lines(text: str) -> list[str]:
     """The lines of ``text`` with HTML comments, fenced blocks and code spans blanked: no link lives there."""
-    text = _HTML_COMMENT.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
     out: list[str] = []
     fence = ""
+    in_comment = False
     for line in text.split("\n"):
         m = _FENCE.match(line)
         if fence:
             if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not line[m.end():].strip():
                 fence = ""
             out.append("")
+            continue
+        if in_comment:
+            end = line.find("-->")
+            if end < 0:
+                out.append("")
+                continue
+            line = " " * (end + 3) + line[end + 3:]
+            in_comment = False
         elif m:
             fence = m.group(1)
             out.append("")
-        else:
-            out.append(_CODE_SPAN.sub(lambda c: " " * len(c.group(0)), line))
+            continue
+        line = _HIDDEN.sub(lambda h: " " * len(h.group(0)), line)
+        opener = line.find("<!--")
+        if opener >= 0:  # no closing arrow on this line: the comment runs on
+            in_comment = True
+            line = line[:opener]
+        out.append(line)
     return out
 
 
