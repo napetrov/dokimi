@@ -551,7 +551,18 @@ def test_a_markdown_escape_in_prose_is_not_a_folder_separator(tmp_path, prose, n
     assert _unreferenced(review) == []
 
 
-@pytest.mark.parametrize("dest", ["${CLAUDE_SKILL_DIR}/", "${CLAUDE_SKILL_DIR}"])
+@pytest.mark.parametrize(
+    "dest",
+    [
+        "${CLAUDE_SKILL_DIR}/",
+        "${CLAUDE_SKILL_DIR}",
+        "<${CLAUDE_SKILL_DIR}/>",
+        "%24%7BCLAUDE_SKILL_DIR%7D/",
+        "\\${CLAUDE_SKILL_DIR}/",
+        "${CLAUDE_SKILL_DIR}/#top",
+        "${CLAUDE_SKILL_DIR}/?a=1",
+    ],
+)
 def test_a_link_to_the_skill_dir_variable_names_the_files_under_it(tmp_path, dest):
     # Same as [home](./): the variable form names the skill root too.
     review = _review_with_texts(tmp_path, f"Use [home]({dest}).\n", {"scripts/helper.py": "x\n"})
