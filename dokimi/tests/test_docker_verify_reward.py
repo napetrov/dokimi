@@ -88,6 +88,11 @@ _NO_FILE = "Error response from daemon: Could not find the file /logs/verifier/r
     (_NO_FILE, 0, "wrote no /logs/verifier/reward.txt"),
     ("Error response from daemon: connection refused", 0, r"docker cp .* failed \(exit 1\)"),
     ("Error response from daemon: connection refused", 1, r"docker cp .* failed \(exit 1\)"),
+    # podman's wording for a missing file (from memory; no podman on this box): still no reward file.
+    ('"/logs/verifier/reward.txt" could not be found on container c1: no such file or directory', 1,
+     0.0),
+    ('"/logs/verifier/reward.txt" could not be found on container c1: no such file or directory', 0,
+     "wrote no /logs/verifier/reward.txt"),
     # A missing Docker socket says "no such file or directory" but names no reward file.
     ("dial unix /var/run/docker.sock: connect: no such file or directory", 1,
      r"docker cp .* failed \(exit 1\)"),
