@@ -30,6 +30,25 @@ _KINDS = (
 )
 
 
+_ESCAPES = {"a": "\a", "b": "\b", "t": "\t", "n": "\n", "v": "\v", "f": "\f", "r": "\r", '"': '"', "\\": "\\"}
+
+
+def _unquote(quoted: str) -> str:
+    """Decode a path git C-quotes, ``"b/a\\tb.py"``: escapes and ``\\ooo`` octal bytes."""
+    raw, out, i = quoted[1:-1], bytearray(), 0
+    while i < len(raw):
+        if raw[i] != "\\" or i + 1 >= len(raw):
+            out += raw[i].encode("utf-8")
+            i += 1
+        elif len(raw[i + 1 : i + 4]) == 3 and set(raw[i + 1 : i + 4]) <= set("01234567"):
+            out.append(int(raw[i + 1 : i + 4], 8))
+            i += 4
+        else:
+            out += _ESCAPES.get(raw[i + 1], raw[i + 1]).encode("utf-8")
+            i += 2
+    return out.decode("utf-8", errors="replace")
+
+
 def added_sites(diff: str) -> list[tuple[str, int, str, str]]:
     """``(path, line, kind, text)`` for each added line of a ``-U0`` diff that matches a kind."""
     sites: list[tuple[str, int, str, str]] = []
@@ -39,6 +58,8 @@ def added_sites(diff: str) -> list[tuple[str, int, str, str]]:
         # Inside a hunk every row is content, even `+++ x` or `--- x`; headers come between hunks.
         if not in_hunk and row.startswith("+++ ") and prev.startswith("--- "):
             target = row[4:].removesuffix("\t")
+            if len(target) >= 2 and target[0] == target[-1] == '"':
+                target = _unquote(target)
             path = target[2:] if target.startswith("b/") else ""
         elif not in_hunk and (m := _HUNK.match(row)):
             old_left = 1 if m.group(1) is None else int(m.group(1))

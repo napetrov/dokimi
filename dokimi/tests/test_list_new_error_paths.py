@@ -86,6 +86,16 @@ def test_a_raise_after_a_semicolon_on_the_same_line_is_listed():
     assert lnep.added_sites(diff) == [("x.py", 1, "raise", "cleanup(); raise ValueError('bad')")]
 
 
+def test_a_git_quoted_path_keeps_its_sites():
+    diff = '--- "a/a\\tb.py"\n+++ "b/a\\tb.py"\n@@ -0,0 +1 @@\n+raise Z\n'
+    assert lnep.added_sites(diff) == [("a\tb.py", 1, "raise", "raise Z")]
+
+
+def test_a_git_quoted_path_with_a_quote_and_a_backslash_is_decoded():
+    diff = '--- "a/q\\"u\\\\x.py"\n+++ "b/q\\"u\\\\x.py"\n@@ -0,0 +1 @@\n+raise Z\n'
+    assert lnep.added_sites(diff) == [('q"u\\x.py', 1, "raise", "raise Z")]
+
+
 def test_a_context_row_inside_a_fused_hunk_is_counted():
     diff = "--- a/x.py\n+++ b/x.py\n@@ -1,3 +1,3 @@\n-raise OldA\n+raise NewA\n unchanged()\n-raise OldB\n+raise NewB\n"
     assert lnep.added_sites(diff) == [("x.py", 1, "raise", "raise NewA"), ("x.py", 3, "raise", "raise NewB")]
