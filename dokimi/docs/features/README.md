@@ -9,7 +9,7 @@ Start with the question you want to answer. Each leaf below links to one feature
 
 **Availability lives in each card:** “Available on main” means implemented in the reviewed source, not verified in every published release. “Partial” names the implemented portion and its unfinished extension. “Open PR” and “Research” describe development work, not shipped interfaces. An open umbrella issue may contain already implemented pieces.
 
-Reviewed against [ae08a920](https://github.com/intel/dokimi/tree/ae08a92063d4bd180f8e03515ab3068f0c71c291) and open feature PRs on 11 November 2026. This is a capability guide, not a release guarantee. A source checkout reports the last release number, so confirm a development feature with `dokimi <command> --help`, not `--version`, and check the linked PR.
+Reviewed against [ae08a920](https://github.com/intel/dokimi/tree/ae08a92063d4bd180f8e03515ab3068f0c71c291) and open feature PRs on 11 November 2026. Cards that say a PR is on main were rechecked against intel/main on 14 November 2026. This is a capability guide, not a release guarantee. A source checkout reports the last release number, so confirm a development feature with `dokimi <command> --help`, not `--version`, and check the linked PR.
 
 ## Browse by question
 

@@ -179,8 +179,8 @@ dokimi dashboard generate --results-dir .
 
 Aggregates per-library results into `DASHBOARD.md` / `dashboard.json` for cross-library
 comparison. It reads every `eval/*.json`, `eval_*.json` and `evaluations/*.json` under
-`--results-dir` (default `results`), so `.` picks up step 4's `eval/oneTBB.json`; the panel
-file sits in `eval/panel/` so it does not show as a second oneTBB row. Like `report generate`, it averages both
+`--results-dir` (default `results`). With `.`, that includes step 4's `eval/oneTBB.json` and the
+`results/onetbb_seed` and `results/onetbb_final` runs from the `benchmark run` steps, so oneTBB appears once per file. The panel file sits in `eval/panel/`, which the pattern does not match. Like `report generate`, it averages both
 arms and the delta, per library and per question source, over the questions scored in
 both arms; a run that scored one arm only shows that arm's mean.
 
