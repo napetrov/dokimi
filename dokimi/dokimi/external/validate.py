@@ -413,8 +413,19 @@ def _link_files(markdown: str) -> list[Optional[str]]:
         ref = _file_ref(raw, link=True)
         if ref is not None and _through_skill_dir(raw):
             ref = SKILL_DIR_VAR + ref
+        elif _is_skill_dir_root(raw):  # ``${CLAUDE_SKILL_DIR}/`` alone names the skill root, as ``./`` does
+            ref = SKILL_DIR_VAR
         files.append(ref)
     return files
+
+
+def _is_skill_dir_root(raw: str) -> bool:
+    """Whether a link destination is the skill root through the variable, with or without its slash."""
+    text = raw.strip()
+    if text.startswith("<") and text.endswith(">"):
+        text = text[1:-1].strip()
+    text = unquote(_ESCAPE_RE.sub(r"\1", text)).split("#", 1)[0].split("?", 1)[0].strip()
+    return text in (SKILL_DIR_VAR, SKILL_DIR_VAR.rstrip("/"))
 
 
 def _through_skill_dir(raw: str) -> bool:

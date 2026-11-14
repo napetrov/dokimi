@@ -55,6 +55,8 @@ _FOLDER_DEST = re.compile(
 SKILL_ROOT_LINK = "${claude_skill_dir}/"  # lowercased: a link through it names a file from the skill root
 # A path prefix that names the skill root or the current folder: ``./scripts/``, ``../scripts/``, ``${CLAUDE_SKILL_DIR}/scripts/``.
 _PATH_PREFIX = re.compile(r"(?<![\w.-])(?:\$\{claude_skill_dir\}/|\.\.?/)")
+# A backslash before ``_``, ``*`` or ``~`` may escape it (``my\_script.py``); see :func:`_matchable` for both readings.
+_ESCAPED = re.compile(r"\\([_*~])")
 
 
 def _walk(skill_dir: Path, *, counted: bool, failed: list[OSError]) -> list[str]:
@@ -172,10 +174,15 @@ def _matchable(text: str, folder: str = ".") -> str:
     A folder destination is in ``links`` as its folder, so ``[scripts](scripts/)`` in a nested document
     does not name the skill-root ``scripts/``; ``./scripts/`` and ``${CLAUDE_SKILL_DIR}/scripts/`` in
     the text name ``scripts/``. A file's name in a destination still names it, as in the text. A backslash
-    is read as a path separator, as a document written on Windows has it (``scripts\\``), after the folder
+    is read as a path separator, as a document written on Windows has it (``scripts\\``); before ``_``, ``*`` or
+    ``~`` it is also read as an escape (``my\\_script.py``), and a name in either reading counts. After the folder
     links are dropped: ``[x](scripts\\)`` is no link (``\\)`` escapes the parenthesis), so it is a mention.
     """
-    return _PATH_PREFIX.sub("", _from_folder(_FOLDER_DEST.sub("]", text).replace("\\", "/"), folder))
+    text = _FOLDER_DEST.sub("]", text)
+    escaped = _ESCAPED.sub(r"\1", text).replace("\\", "/")  # my\_script.py names my_script.py
+    separated = text.replace("\\", "/")  # scripts\_helper.py names scripts/_helper.py
+    both = escaped if escaped == separated else escaped + "\n" + separated  # a name in either reading counts
+    return _PATH_PREFIX.sub("", _from_folder(both, folder))
 
 
 def _read_doc(path: Path) -> Optional[str]:

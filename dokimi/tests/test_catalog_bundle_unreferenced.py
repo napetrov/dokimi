@@ -542,3 +542,44 @@ def test_a_nested_link_to_the_skill_root_names_the_files_under_it(tmp_path):
         {"references/guide.md": "Use [root](../).\n", "scripts/helper.py": "x\n"},
     )
     assert _unreferenced(review) == []
+
+
+@pytest.mark.parametrize(("prose", "name"), [("Run my\\_script.py.\n", "my_script.py"), ("Run my\\~script.py.\n", "my~script.py")])
+def test_a_markdown_escape_in_prose_is_not_a_folder_separator(tmp_path, prose, name):
+    # A backslash before _, * or ~ is a Markdown escape, not a Windows path separator.
+    review = _review_with_texts(tmp_path, prose, {name: "x\n"})
+    assert _unreferenced(review) == []
+
+
+@pytest.mark.parametrize("dest", ["${CLAUDE_SKILL_DIR}/", "${CLAUDE_SKILL_DIR}"])
+def test_a_link_to_the_skill_dir_variable_names_the_files_under_it(tmp_path, dest):
+    # Same as [home](./): the variable form names the skill root too.
+    review = _review_with_texts(tmp_path, f"Use [home]({dest}).\n", {"scripts/helper.py": "x\n"})
+    assert _unreferenced(review) == []
+
+
+@pytest.mark.parametrize(
+    ("body", "texts", "unnamed"),
+    [
+        # _mentions checks every occurrence, not only the first, which is a longer name here
+        ("Run rebuild.py and then build.py.\n", {"build.py": "x\n", "rebuild.py": "x\n"}, None),
+        ("Run my-build.py.\n", {"build.py": "x\n"}, "build.py"),  # a name after "-" is a longer name
+        ("Run build.py-old.\n", {"build.py": "x\n"}, "build.py"),  # a name followed by "-" is a longer name
+        ("Read GUIDE.MD.\n", {"GUIDE.MD": "See extra.md.\n", "extra.md": "x\n"}, None),  # a document's suffix is any case
+        ("Run helper.py.\n", {"helper.py": "See guide.md.\n", "guide.md": "x\n"}, "guide.md"),  # a script is not read for links
+        ("Run it.\n", {"tests/helper.py": "x\n", "Tests/other.py": "x\n"}, None),  # a test folder is not counted, any case
+    ],
+)
+def test_the_name_search_and_the_document_reads_hold_at_the_edges(tmp_path, body, texts, unnamed):
+    review = _review_with_texts(tmp_path, body, texts)
+    if unnamed is None:
+        assert _unreferenced(review) == []
+    else:
+        [message] = _unreferenced(review)
+        assert unnamed in message
+
+
+def test_a_windows_path_with_an_underscore_name_still_names_its_file(tmp_path):
+    # Read both ways: the escape reading drops the separator, so the separator reading must stay.
+    review = _review_with_texts(tmp_path, "Run `scripts\\_helper.py`.\n", {"scripts/_helper.py": "x\n"})
+    assert _unreferenced(review) == []
