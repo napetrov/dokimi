@@ -25,7 +25,7 @@ The direction in [#94](https://github.com/intel/dokimi/issues/94) and [#276](htt
 
 [#624](https://github.com/intel/dokimi/issues/624) (closed) asked for partial, stage-labelled evidence from capped novelty runs and for estimates closer to actual spend. On main, `skill novelty analyze` keeps a partial record when the cap stops it; this page has not verified the stage labels or the estimate changes. The issue does not establish that recovery/resume already works.
 
-A refactor of novelty role clients and costs in [#625](https://github.com/intel/dokimi/pull/625) (merged) is not itself a promise to fix those behaviours. Today, keep the command-specific persistence limits in mind and treat an estimate as an estimate. See [reviewing](../reviewing.md) and [known limitations](limitations.md).
+A refactor of novelty role clients and costs in [#625](https://github.com/intel/dokimi/pull/625) (merged) is not itself a promise to fix those behaviours. Today, check each command's persistence notes (for `skill shorten`, pass `--cache-dir` so a capped run can be replayed) and treat an estimate as an estimate. See [reviewing](../reviewing.md) and [known limitations](limitations.md).
 
 ## Migration checklist
 
