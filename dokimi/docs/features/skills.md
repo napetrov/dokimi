@@ -99,11 +99,11 @@ Scan a catalog with per-skill results, worker jobs and resumption. Choose the sk
 
 **Availability:** Partial — implemented core with proposed extensions.
 
-Run the existing skill/catalog validation before paid evaluation; structural warnings help locate packaging problems. Proposed extensions add packaging findings such as missing bundle paths, unreferenced files and missing frontmatter. Confirm an unreferenced file is not intentional before removing it.
+Run the existing skill/catalog validation before paid evaluation; structural warnings help locate packaging problems. Further packaging findings are proposed in PRs [#558](https://github.com/intel/dokimi/pull/558) and [#559](https://github.com/intel/dokimi/pull/559). Confirm an unreferenced file is not intentional before removing it.
 
 **Input:** Skill metadata, descriptions, paths and bundle structure in the catalog being checked.
 
-**Scope and limits:** Checks on main; PRs [#454](https://github.com/intel/dokimi/pull/454), [#556](https://github.com/intel/dokimi/pull/556), [#558](https://github.com/intel/dokimi/pull/558), [#559](https://github.com/intel/dokimi/pull/559) add packaging findings, and [#557](https://github.com/intel/dokimi/pull/557) an unrestricted-Bash warning. These are not on main.
+**Scope and limits:** Checks on main, including `path-missing` ([#556](https://github.com/intel/dokimi/pull/556)) and the `allowed-tools-unrestricted-bash` warning ([#557](https://github.com/intel/dokimi/pull/557)). PRs [#558](https://github.com/intel/dokimi/pull/558) and [#559](https://github.com/intel/dokimi/pull/559) are not on main yet.
 
 **Result:** Structural findings from existing checks; proposed packaging findings remain separate until merged.
 
@@ -117,17 +117,17 @@ Run the existing skill/catalog validation before paid evaluation; structural war
 
 ![Check bundled scripts: Find script defects without executing the bundle.](../assets/features/43-check-bundled-scripts.webp)
 
-**Availability:** Open PR.
+**Availability:** Available on main.
 
-The proposed checks inspect Python/shell syntax, line endings and optional lint tools without running the bundled script. Warnings and notes are not a complete runtime test.
+The checks inspect Python/shell syntax, line endings and optional lint tools without running the bundled script. Warnings and notes are not a complete runtime test.
 
 **Input:** A skill's bundled Python/shell scripts and optional local syntax/lint tools.
 
-**Scope and limits:** PR [#455](https://github.com/intel/dokimi/pull/455); warnings / notes, optional bash, ruff and shellcheck.
+**Scope and limits:** Warnings and notes; optional bash, ruff and shellcheck.
 
-**Result:** Proposed script findings; see PR [#455](https://github.com/intel/dokimi/pull/455) for the current implementation before relying on them.
+**Result:** `script-crlf`, `script-syntax` and the `script-lint` finding in `catalog check`.
 
-**Next step:** Read the linked proposal for progress and the related guide for existing components. This card is not a runnable end-to-end interface.
+**Next step:** Run `catalog check` on the skill, then fix what it reports.
 
 [Related existing workflow](../external-content.md) · [Back to feature tree](README.md)
 
@@ -137,17 +137,17 @@ The proposed checks inspect Python/shell syntax, line endings and optional lint 
 
 ![Check external references: Separate a missing resource from a failed network check.](../assets/features/44-check-external-references.webp)
 
-**Availability:** Open PR.
+**Availability:** Available on main.
 
-The proposed opt-in network checks distinguish confirmed missing packages/links from unknown or skipped targets. Timeouts and refusals are not evidence that a resource is absent.
+The opt-in network checks distinguish confirmed missing packages/links from unknown or skipped targets. Timeouts and refusals are not evidence that a resource is absent.
 
-**Input:** Package references and external URLs in the selected catalog, with opt-in network access for the proposed checks.
+**Input:** Package references and external URLs in the selected catalog, with opt-in network access for the checks.
 
-**Scope and limits:** PR [#459](https://github.com/intel/dokimi/pull/459); opt-in, warning-only checks; network errors are not absence.
+**Scope and limits:** `catalog check --online`; opt-in, warning-only checks; network errors are not absence.
 
-**Result:** Proposed reference checks; no shipped end-to-end path is promised here.
+**Result:** Warnings for missing packages and dead links from `catalog check --online`.
 
-**Next step:** Read the linked proposal for progress and the related guide for existing components. This card is not a runnable end-to-end interface.
+**Next step:** Run `catalog check --online` where network access is allowed.
 
 [Related existing workflow](../external-content.md) · [Back to feature tree](README.md)
 
