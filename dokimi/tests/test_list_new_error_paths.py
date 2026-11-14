@@ -123,6 +123,19 @@ def test_main_passes_explicit_prefixes_and_no_fused_hunks(monkeypatch):
     assert {"--src-prefix=a/", "--dst-prefix=b/", "--inter-hunk-context=0"} <= set(seen[0])
 
 
+def test_main_pins_the_diff_output_indicators(monkeypatch):
+    seen = []
+
+    def fake_run(cmd, **kwargs):
+        seen.append(cmd)
+        return lnep.subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(lnep.subprocess, "run", fake_run)
+    assert lnep.main([]) == 0
+    flags = {"--output-indicator-new=+", "--output-indicator-old=-", "--output-indicator-context= "}
+    assert flags <= set(seen[0])
+
+
 def _external_diff(repo, monkeypatch):
     monkeypatch.setenv("GIT_EXTERNAL_DIFF", "true")
 
