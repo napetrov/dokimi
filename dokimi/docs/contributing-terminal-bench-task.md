@@ -156,7 +156,7 @@ The contract:
   Without it the exit code is no pass: exit 0 errors the cell and a non-zero
   exit scores 0. This is the rule for this format; a terminal-bench v1 task
   (`task.yaml`) is still graded by its pytest summary. A file with no number
-  in it (`PASS`, empty) errors the cell.
+  between 0 and 1 in it (`PASS`, empty, `75`) errors the cell.
 - Do not let a failure abort before the reward file is written (capture the
   pytest exit code, write the file, then exit with it).
 

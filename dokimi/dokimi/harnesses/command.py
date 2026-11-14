@@ -461,7 +461,9 @@ def _reward_file_verdict(text: str) -> float:
     """
     reward = _parse_reward_text(text, reward_file=True)
     if reward is None:
-        raise RuntimeError("/logs/verifier/reward.txt has no reward in it; see run.log")
+        raise RuntimeError(
+            "/logs/verifier/reward.txt has no reward between 0 and 1 in it; see run.log"
+        )
     return reward
 
 
