@@ -252,3 +252,29 @@ def test_resample_drops_grades_of_answers_that_changed(tmp_path, monkeypatch):
     (study / "probe_results.jsonl").write_text(results("new").replace('"p2"', '"p3"'))
     jp.do_sample(2)
     assert grades.read_text() == ""
+
+
+def test_resample_drops_repeats_of_cells_that_left_and_their_grades(tmp_path, monkeypatch):
+    # p9 leaves the sample: its repeat and the repeat's grade go, or do_grade would grade a repeat
+    # with no baseline and gen.py would stop with a KeyError.
+    study = tmp_path / "study" / "data"
+    study.mkdir(parents=True)
+    arms = ["no_skill", "root", "routed", "full", "placebo", "shuffled"]
+    (study / "probe_results.jsonl").write_text("".join(json.dumps({
+        "probe_id": "p1", "model": "claude-opus-5", "arm": a, "skill": "s", "adversarial": False,
+        "verdict": "correct_complete", "answer": "same"}) + "\n" for a in arms))
+    jp = _load(tmp_path, monkeypatch, [])
+    out = tmp_path / "out"
+    repeats = [{"probe_id": p, "model": "claude-opus-5", "arm": "no_skill_repeat", "answer": "r",
+                "question": "q"} for p in ("p1", "p9")]
+    (out / "repeats.jsonl").write_text("".join(json.dumps(r) + "\n" for r in repeats))
+    grades = [{"key": f"{p}|no_skill_repeat|claude-opus-5", "judge": "j1", "verdict": "wrong_other"}
+              for p in ("p1", "p9")]
+    (out / "grades.jsonl").write_text("".join(json.dumps(g) + "\n" for g in grades))
+
+    jp.do_sample(2)
+
+    kept = [json.loads(line)["probe_id"] for line in (out / "repeats.jsonl").read_text().splitlines()]
+    assert kept == ["p1"]
+    left = [json.loads(line)["key"] for line in (out / "grades.jsonl").read_text().splitlines()]
+    assert left == ["p1|no_skill_repeat|claude-opus-5"]

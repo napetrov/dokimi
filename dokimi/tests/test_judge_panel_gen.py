@@ -185,3 +185,132 @@ def test_analyze_names_a_study_judge_with_no_grades(tmp_path):
     assert r.returncode != 0
     assert "glm-5" in r.stderr
     assert "Traceback" not in r.stderr
+
+
+def test_gen_lenient_delta_keeps_four_decimals(tmp_path):
+    # One of 60 shared answers differs, so the delta is -1/60: -0.0167 at four decimals, -0.0 at one.
+    out = tmp_path / "out"
+    _write(out, GEN_JUDGES)
+    grades = [json.loads(line) for line in (out / "grades.jsonl").read_text().splitlines()]
+    for g in grades:
+        if g["judge"] == "gpt-6-luna":
+            g["verdict"] = "wrong_other" if g["key"] == "p0|full|claude-opus-5" else "correct_complete"
+    (out / "grades.jsonl").write_text("".join(json.dumps(g) + "\n" for g in grades))
+
+    r = _gen(out)
+
+    assert r.returncode == 0, r.stderr[-800:]
+    summary = json.loads((out / "gen_summary.json").read_text())
+    pair = next(p for p in summary["pairs"] if p["old"] == "gpt-5.6-luna" and p["new"] == "gpt-6-luna")
+    assert pair["lenient_rate_delta"] == -0.0167
+
+
+PANEL = ["claude-sonnet-5", "gpt-6-luna", "grok-4.6", "kimi-k3", "deepseek-v3.2", "glm-5", "qwen3-vl-235b"]
+
+
+def _analyze(out):
+    return subprocess.run([sys.executable, str(RJ / "analyze.py"), str(out)],
+                          capture_output=True, text=True, cwd=out.parent)
+
+
+def _csv(out, name):
+    import csv
+
+    with (out / "tables" / name).open() as fh:
+        return list(csv.DictReader(fh))
+
+
+def _rewrite_grades(out, edit):
+    grades = [json.loads(line) for line in (out / "grades.jsonl").read_text().splitlines()]
+    grades = [g for g in (edit(g) for g in grades) if g is not None]
+    (out / "grades.jsonl").write_text("".join(json.dumps(g) + "\n" for g in grades))
+
+
+def test_analyze_leaves_a_constant_label_pair_without_kappa(tmp_path):
+    # glm-5 and qwen3-vl-235b give one label on every row: kappa is 0/0, not 1.0, and the mean skips it.
+    out = tmp_path / "out"
+    _write(out, PANEL)
+
+    def edit(g):
+        if g["judge"] in ("glm-5", "qwen3-vl-235b"):
+            g["verdict"] = "correct_complete"
+        return g
+
+    _rewrite_grades(out, edit)
+
+    r = _analyze(out)
+
+    assert r.returncode == 0, r.stderr[-800:]
+    rows = _csv(out, "pairwise_kappa.csv")
+    pair = next(x for x in rows if (x["judge_a"], x["judge_b"]) == ("glm-5", "qwen3-vl-235b"))
+    assert pair["kappa_6way"] == pair["kappa_lenient"] == pair["kappa_strict"] == ""
+    known = [float(x["kappa_lenient"]) for x in rows
+             if "glm-5" in (x["judge_a"], x["judge_b"]) and x["kappa_lenient"] != ""]
+    assert known
+    summary = json.loads((out / "summary.json").read_text())
+    assert summary["mean_kappa_lenient"]["glm-5"] == round(sum(known) / len(known), 3)
+
+
+def test_analyze_mean_score_rule_counts_seven_partially_correct(tmp_path):
+    # Seven scores of 0.4 average to 0.39999999999999997: the mean rule must still reach 0.4.
+    out = tmp_path / "out"
+    _write(out, PANEL)
+
+    def edit(g):
+        g["verdict"] = "partially_correct" if "|full|" in g["key"] else "wrong_other"
+        return g
+
+    _rewrite_grades(out, edit)
+
+    r = _analyze(out)
+
+    assert r.returncode == 0, r.stderr[-800:]
+    table = {(x["rule"], x["answer_model"]): x for x in _csv(out, "aggregation_rules.csv")}
+    assert table[("median_score>=0.4", "claude-opus-5")]["added"] == "1.0"
+    assert table[("mean_score>=0.4", "claude-opus-5")]["added"] == "1.0"
+
+
+def test_analyze_names_a_judge_with_no_grades_for_one_answer_model(tmp_path):
+    out = tmp_path / "out"
+    _write(out, PANEL)
+    _rewrite_grades(out, lambda g: None if g["judge"] == "glm-5" and g["key"].endswith("|claude-opus-5") else g)
+
+    r = _analyze(out)
+
+    assert r.returncode != 0
+    assert "glm-5" in r.stderr
+    assert "claude-opus-5" in r.stderr
+    assert "Traceback" not in r.stderr
+
+
+def test_analyze_names_the_original_judge_with_no_verdict_for_one_answer_model(tmp_path):
+    out = tmp_path / "out"
+    _write(out, PANEL)
+    sample = [json.loads(line) for line in (out / "sample.jsonl").read_text().splitlines()]
+    for s in sample:
+        if s["model"] == "claude-opus-5" and s["arm"] == "no_skill":
+            s["verdict"] = None
+    (out / "sample.jsonl").write_text("".join(json.dumps(s) + "\n" for s in sample))
+
+    r = _analyze(out)
+
+    assert r.returncode != 0
+    assert "gpt-5.6-luna" in r.stderr
+    assert "claude-opus-5" in r.stderr
+    assert "Traceback" not in r.stderr
+
+
+def test_analyze_leaves_agreement_empty_for_judges_with_no_answer_in_common(tmp_path):
+    out = tmp_path / "out"
+    _write(out, PANEL)
+    only = {"glm-5": "p0", "qwen3-vl-235b": "p1"}
+    _rewrite_grades(out, lambda g: None if g["judge"] in only and not g["key"].startswith(only[g["judge"]])
+                    else g)
+
+    r = _analyze(out)
+
+    assert r.returncode == 0, r.stderr[-800:]
+    pair = next(x for x in _csv(out, "pairwise_kappa.csv")
+                if (x["judge_a"], x["judge_b"]) == ("glm-5", "qwen3-vl-235b"))
+    assert pair["n"] == "0"
+    assert pair["agree_lenient"] == pair["kappa_lenient"] == ""

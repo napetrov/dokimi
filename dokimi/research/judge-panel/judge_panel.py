@@ -107,6 +107,16 @@ def do_sample(per_model: int):
         with sp.open() as fh:
             old = [json.loads(line) for line in fh]
         purge_grades({key(r) for r in old if key(r) not in new or new[key(r)] != r["answer"]})
+    rpath = OUT / "repeats.jsonl"
+    if rpath.exists():  # a repeat of a cell that left the sample has no baseline: drop it and its grades
+        cells = {(r["probe_id"], r["model"]) for r in out}
+        with rpath.open() as fh:
+            reps = [json.loads(line) for line in fh]
+        purge_grades({key(r) for r in reps if (r["probe_id"], r["model"]) not in cells})
+        tmp = rpath.with_suffix(".jsonl.tmp")
+        with tmp.open("w") as fh:
+            fh.writelines(json.dumps(r) + "\n" for r in reps if (r["probe_id"], r["model"]) in cells)
+        tmp.replace(rpath)
     with sp.open("w") as fh:
         for r in out:
             fh.write(json.dumps(r) + "\n")

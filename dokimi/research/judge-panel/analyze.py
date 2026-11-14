@@ -140,6 +140,13 @@ def run_study():
     # Name a study judge with no grades before any table is written, instead of a TypeError later.
     if no_grades := [j for j in JUDGES if not summary["coverage"][j]]:
         raise SystemExit(f"analyze.py has no grades from {', '.join(no_grades)}; grade those judges first")
+    # A judge with no complete no_skill/full/placebo triplet for an answer model has a None headline.
+    # Name it here, before any table is written, instead of failing on the rounding or the std later.
+    for j in JUDGES:
+        for m in MODELS:
+            if headline(judge_get(j, LEN), m, LEN)["n"] == 0:
+                raise SystemExit(f"analyze.py has no complete no_skill/full/placebo triplet for {m} "
+                                 f"under {j}; grade it on every arm first")
 
     # ---------- 1. per-judge headline numbers ----------
     hl = {}
@@ -235,7 +242,7 @@ def run_study():
             _round(kappa(a6, b6, V6)),
             _round(kappa(al, bl, [True, False])),
             _round(kappa(as_, bs, [True, False])),
-            round(sum(x == y for x, y in zip(al, bl, strict=True)) / len(ks), 3),
+            round(sum(x == y for x, y in zip(al, bl, strict=True)) / len(ks), 3) if ks else None,
         ]
         kap[(j1, j2)] = kap[(j2, j1)] = r[4]
         kt.append(r)
@@ -331,7 +338,7 @@ def run_study():
 
         out = {
             "majority": mk(lambda v, k: sum(x in LEN for x in v) > len(v) / 2),
-            "mean_score>=0.4": mk(lambda v, k: np.mean([SCORE[x] for x in v]) >= 0.4),
+            "mean_score>=0.4": mk(lambda v, k: round(float(np.mean([SCORE[x] for x in v])), 9) >= 0.4),  # seven 0.4s sum to 0.39999999999999997
             "median_score>=0.4": mk(lambda v, k: np.median([SCORE[x] for x in v]) >= 0.4),
             "unanimous": mk(lambda v, k: all(x in LEN for x in v)),
             "any_correct": mk(lambda v, k: any(x in LEN for x in v)),
