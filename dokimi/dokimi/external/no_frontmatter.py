@@ -26,7 +26,7 @@ SETEXT_UNDERLINE_RE = re.compile(r"=+")  # the underline of a setext H1 (a --- o
 # Code spans and inline comments stay in their paragraph and within 1024 characters (bounded: linear time).
 # A comment that opens a line may run over blank lines; unclosed, it runs to the end.
 _COMMENT_RE = re.compile(
-    r"(`+)(?:(?!\n[ \t]*\n).){1,1024}?\1|^[ \t]*<!--(?!.*?-->).*\Z|^[ \t]*<!--.*?-->|<!--(?:(?!\n[ \t]*\n).){0,1024}?-->",
+    r"(?<!`)(`+)(?!`)(?:(?!\n[ \t]{0,1024}\n).){1,1024}?(?<!`)\1(?!`)|^[ \t]*<!--(?!.*?-->).*\Z|^[ \t]*<!--.*?-->|<!--(?:(?!\n[ \t]{0,1024}\n).){0,1024}?-->",
     re.S | re.M,
 )
 

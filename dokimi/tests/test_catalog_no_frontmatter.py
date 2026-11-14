@@ -313,3 +313,12 @@ def test_a_marker_or_backtick_does_not_reach_across_a_blank_line():
     assert _block(no_frontmatter_message(stray, "t", at_root=True))["description"] == "Intro <!-- never closed."
     paired = ["Intro with ` tick.", "", "# T", "", "<!--", "TODO: fill in", "-->", "", "Real.", "", "More ` here."]
     assert _block(no_frontmatter_message(paired, "t", at_root=True))["description"] == "Real."
+
+
+def test_a_long_run_of_backticks_is_searched_in_linear_time():
+    # A run of backticks that is not a fence, in one paragraph: the search must not backtrack over it.
+    import time
+
+    start = time.monotonic()
+    no_frontmatter_message(["# T", "", "x " + "`" * 10000 + " end"], "t", at_root=True)
+    assert time.monotonic() - start < 1.0
