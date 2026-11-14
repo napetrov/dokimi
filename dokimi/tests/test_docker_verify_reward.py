@@ -84,10 +84,15 @@ _NO_FILE = "Error response from daemon: Could not find the file /logs/verifier/r
 
 
 @pytest.mark.parametrize(("stderr", "exit_code", "outcome"), [
-    (_NO_FILE, 1, 0.0),  # docker's own "no such file": still a verifier that wrote none
+    (_NO_FILE, 1, 0.0),  # docker's own "could not find the file": still a verifier that wrote none
     (_NO_FILE, 0, "wrote no /logs/verifier/reward.txt"),
     ("Error response from daemon: connection refused", 0, r"docker cp .* failed \(exit 1\)"),
     ("Error response from daemon: connection refused", 1, r"docker cp .* failed \(exit 1\)"),
+    # A missing Docker socket says "no such file or directory" but names no reward file.
+    ("dial unix /var/run/docker.sock: connect: no such file or directory", 1,
+     r"docker cp .* failed \(exit 1\)"),
+    ("dial unix /var/run/docker.sock: connect: no such file or directory", 0,
+     r"docker cp .* failed \(exit 1\)"),
 ])
 def test_docker_verify_a_failed_reward_copy_is_not_a_missing_reward_file(
         tmp_path, stderr, exit_code, outcome):

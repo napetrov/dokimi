@@ -466,7 +466,7 @@ def _reward_file_verdict(text: str) -> float:
 
 
 # What docker says when the file is not there (v20+, older CLIs, podman); a daemon error says none.
-_CP_NO_FILE_RE = re.compile(r"could not find the file|no such container:path|no such file", re.I)
+_CP_NO_FILE_RE = re.compile(r"could not find the file|no such container:path", re.I)
 
 
 def _check_reward_copy(pulled: process.Completed) -> None:
