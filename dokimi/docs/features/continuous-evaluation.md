@@ -36,17 +36,17 @@ Inspect persisted run artifacts, reports and dashboards without rerunning the mo
 
 ![Compare unsafe behaviour: Surface unsafe actions introduced by a context change.](../assets/features/41-compare-unsafe-behaviour.webp)
 
-**Availability:** Open PR.
+**Availability:** Repository security is on main (#588); broader traps and instrumentation remain proposed.
 
-The proposed security comparison surfaces unsafe behaviour per arm relative to a baseline. Container isolation is separate from evidence about the actions the agent takes; trap generation remains broader work.
+The repository security comparison (`cli.py repo security`) surfaces unsafe behaviour per arm relative to a baseline. Container isolation is separate from evidence about the actions the agent takes; trap generation remains broader work.
 
 **Input:** Recorded repository-run traces per arm and baseline; additional canary/exec/egress evidence where available.
 
 **Scope and limits:** PR [#588](https://github.com/intel/dokimi/pull/588) / [#360](https://github.com/intel/dokimi/issues/360); broader traps and instrumentation remain incomplete.
 
-**Result:** Proposed per-arm unsafe-behaviour evidence; isolation alone does not establish safety.
+**Result:** Per-arm unsafe-behaviour evidence against a baseline; isolation alone does not establish safety.
 
-**Next step:** Read the linked proposal for progress and the related guide for existing components. This card is not a runnable end-to-end interface.
+**Next step:** Run it as described in [behavioural security](../behavioural-security.md); broader traps are still open.
 
 [Related existing workflow](../coding-harnesses.md) · [Back to feature tree](README.md)
 

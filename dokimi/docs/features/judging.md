@@ -55,7 +55,7 @@ Probe judge validity with degraded answers and examine agreement, order and word
 
 ![Ground novelty checks: Catch unsupported identifiers before trusting the grade.](../assets/features/34-ground-novelty-checks.webp)
 
-**Availability:** Open PR.
+**Availability:** Identifier checks on main; execution and source checks open.
 
 The identifier checks compare an answer with tool evidence such as help text, while retaining the judge as a separate signal. Broader execution and source checks remain proposals.
 
@@ -63,8 +63,8 @@ The identifier checks compare an answer with tool evidence such as help text, wh
 
 **Scope and limits:** Identifier checks are on main (`commands/novelty_ground.py`, [#472](https://github.com/intel/dokimi/pull/472)); exec/source grading remain proposed.
 
-**Result:** Proposed grounding evidence for novelty checks; not a general correctness guarantee.
+**Result:** Identifier-check evidence for novelty checks; not a general correctness guarantee.
 
-**Next step:** Read the linked proposal for progress and the related guide for existing components. This card is not a runnable end-to-end interface.
+**Next step:** Read the scope above before relying on the identifier checks; execution and source grading are not runnable yet.
 
 [Related existing workflow](../skill-novelty.md) · [Back to feature tree](README.md)

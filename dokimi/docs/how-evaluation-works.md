@@ -104,8 +104,7 @@ opened it), `not_loaded`, or `error` (the scenario gave no usable answer).
 Guidance nobody reads cannot help anyone, which makes this the cheapest check
 to run first.
 [repo-evaluation-contract.md](repo-evaluation-contract.md) is the interface a
-repository codes against; the task-run and grading half is still being built,
-and that document is marked PROPOSED until it lands.
+repository codes against. Its core is implemented; scoped extensions are marked as such in that document.
 
 ## Why this matters
 

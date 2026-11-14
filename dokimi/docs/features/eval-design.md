@@ -106,7 +106,7 @@ The workflow maps checkable statements in a skill to existing checks and lists u
 
 **Result:** A rule-to-check mapping for review; see `dokimi eval skill-coverage --help`.
 
-**Next step:** Read the linked proposal for progress and the related guide for existing components. This card is not a runnable end-to-end interface.
+**Next step:** Run `dokimi eval skill-coverage --help`, then confirm each candidate by hand; the mapping is estimated.
 
 [Related existing workflow](../external-content.md) · [Back to feature tree](README.md)
 

@@ -5,7 +5,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # Open work index
 
-Snapshot of all 109 open issues and pull requests in `intel/dokimi`, reviewed on **11 November 2026**. This inventory includes maintenance and bugs, not only features. Open means open at review time, not scheduled or unimplemented in full. The linked issue/PR is the live source; check merged code before carrying an old umbrella claim into usage documentation.
+Snapshot of the 109 open issues and pull requests in `intel/dokimi`, reviewed on **11 November 2026**; the pull requests marked Merged landed on main by 14 November 2026. This inventory includes maintenance and bugs, not only features. Open means open at review time, not scheduled or unimplemented in full. The linked issue/PR is the live source; check merged code before carrying an old umbrella claim into usage documentation.
 
 Read the [development guide](README.md) for user outcomes, [interface migrations](interfaces.md) for automation impact, and [known limitations](limitations.md) for result interpretation. Individual feature availability remains in the [feature cards](../features/README.md).
 
@@ -38,25 +38,25 @@ Read the [development guide](README.md) for user outcomes, [interface migrations
 | [#407](https://github.com/intel/dokimi/issues/407) | Open issue | Judge reliability: connect multi-judge pieces and verify evidence |
 | [#413](https://github.com/intel/dokimi/issues/413) | Open issue | Corpus-scale scan gaps (catalog scan, novelty accuracy) |
 | [#424](https://github.com/intel/dokimi/issues/424) | Open issue | catalog granularity: decide whether skills should be split, merged, or regrouped (static check + paid partition eval) |
-| [#441](https://github.com/intel/dokimi/pull/441) | Open PR | feat(eval): skill coverage — uncovered skill items as candidate checks (#220 A5) |
+| [#441](https://github.com/intel/dokimi/pull/441) | Merged | feat(eval): skill coverage — uncovered skill items as candidate checks (#220 A5) |
 | [#454](https://github.com/intel/dokimi/pull/454) | Open PR | fix(validate): read the when cue of each language in description-no-when |
-| [#455](https://github.com/intel/dokimi/pull/455) | Open PR | feat(catalog): check the scripts a skill bundles |
-| [#459](https://github.com/intel/dokimi/pull/459) | Open PR | feat(catalog): catalog check --online reports missing packages and dead links |
-| [#472](https://github.com/intel/dokimi/pull/472) | Open PR | novelty: program checks on probes (identifiers veto) + grading-ladder design note |
+| [#455](https://github.com/intel/dokimi/pull/455) | Merged | feat(catalog): check the scripts a skill bundles |
+| [#459](https://github.com/intel/dokimi/pull/459) | Merged | feat(catalog): catalog check --online reports missing packages and dead links |
+| [#472](https://github.com/intel/dokimi/pull/472) | Merged | novelty: program checks on probes (identifiers veto) + grading-ladder design note |
 | [#482](https://github.com/intel/dokimi/pull/482) | Open PR | docs: judge-panel study of the skill-novelty headline numbers |
 | [#489](https://github.com/intel/dokimi/pull/489) | Open PR | feat(novelty): judge panel (--judge repeatable, --judge-aggregate) |
-| [#556](https://github.com/intel/dokimi/pull/556) | Open PR | feat(catalog): path-missing, a warn for missing bundle paths in code spans |
-| [#557](https://github.com/intel/dokimi/pull/557) | Open PR | feat(catalog): allowed-tools-unrestricted-bash warn |
+| [#556](https://github.com/intel/dokimi/pull/556) | Merged | feat(catalog): path-missing, a warn for missing bundle paths in code spans |
+| [#557](https://github.com/intel/dokimi/pull/557) | Merged | feat(catalog): allowed-tools-unrestricted-bash warn |
 | [#558](https://github.com/intel/dokimi/pull/558) | Open PR | feat(catalog): not-a-skill-no-frontmatter, with a suggested frontmatter block |
 | [#559](https://github.com/intel/dokimi/pull/559) | Open PR | feat(catalog): bundle-file-unreferenced, bundled files SKILL.md never names |
-| [#588](https://github.com/intel/dokimi/pull/588) | Open PR | feat(repo): repo security, unsafe agent behaviour per arm against the baseline (#360) |
+| [#588](https://github.com/intel/dokimi/pull/588) | Merged | feat(repo): repo security, unsafe agent behaviour per arm against the baseline (#360) |
 | [#589](https://github.com/intel/dokimi/pull/589) | Open PR | fix(eval): eval writers go through save_artifact (#277 R4) |
-| [#590](https://github.com/intel/dokimi/pull/590) | Open PR | feat(cli): every --json leaf emits cli_output.v1 |
+| [#590](https://github.com/intel/dokimi/pull/590) | Merged | feat(cli): every --json leaf emits cli_output.v1 |
 | [#592](https://github.com/intel/dokimi/pull/592) | Open PR | fix(cli): exits 3, 4 and 5 per the §2.6 table; a crash exits 5 |
-| [#593](https://github.com/intel/dokimi/pull/593) | Open PR | feat(repo): scan without a manifest checks the rules and @ imports Claude Code loads |
-| [#594](https://github.com/intel/dokimi/pull/594) | Open PR | feat(eval): eval graph builds the frozen need graph for eval coverage (#331) |
-| [#595](https://github.com/intel/dokimi/pull/595) | Open PR | feat(cli): skill routing and catalog routing replace novelty routing (#94 M3) |
-| [#596](https://github.com/intel/dokimi/pull/596) | Open PR | feat(eval): eval headroom does not count cached replays as fresh reps |
+| [#593](https://github.com/intel/dokimi/pull/593) | Merged | feat(repo): scan without a manifest checks the rules and @ imports Claude Code loads |
+| [#594](https://github.com/intel/dokimi/pull/594) | Merged | feat(eval): eval graph builds the frozen need graph for eval coverage (#331) |
+| [#595](https://github.com/intel/dokimi/pull/595) | Merged | feat(cli): skill routing and catalog routing replace novelty routing (#94 M3) |
+| [#596](https://github.com/intel/dokimi/pull/596) | Merged | feat(eval): eval headroom does not count cached replays as fresh reps |
 | [#624](https://github.com/intel/dokimi/issues/624) | Open issue | novelty analyze: a --max-usd stop writes nothing it paid for, and --estimate-only runs below the real bill |
 | [#626](https://github.com/intel/dokimi/issues/626) | Open issue | repo: guidance_read does not count a grep or rg over a guidance file, so delivery reads undercount |
 
