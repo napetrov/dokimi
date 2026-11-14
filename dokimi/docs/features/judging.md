@@ -61,7 +61,7 @@ The identifier checks compare an answer with tool evidence such as help text, wh
 
 **Input:** Novelty probes, claimed identifiers and tool-help/reference evidence for the grounding checks.
 
-**Scope and limits:** Identifier checks are on main (`commands/novelty_ground.py`, [#472](https://github.com/intel/dokimi/pull/472)); exec/source grading remain proposed.
+**Scope and limits:** Identifier checks are on main (`commands/novelty_ground.py`, [#472](https://github.com/intel/dokimi/pull/472) (merged)); exec/source grading remain proposed.
 
 **Result:** Identifier-check evidence for novelty checks; not a general correctness guarantee.
 

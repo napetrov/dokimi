@@ -82,7 +82,7 @@ Provide a frozen need graph and explicit needs labels on the eval checks. Inspec
 
 **Input:** A frozen need graph and eval checks with explicit need labels.
 
-**Scope and limits:** Basic eval coverage in main; graph builder on main ([#594](https://github.com/intel/dokimi/pull/594)); broader [#331](https://github.com/intel/dokimi/issues/331).
+**Scope and limits:** Basic eval coverage in main; graph builder on main ([#594](https://github.com/intel/dokimi/pull/594) (merged)); broader [#331](https://github.com/intel/dokimi/issues/331).
 
 **Result:** Coverage gaps within the declared need-space model, not all possible user work.
 
@@ -102,7 +102,7 @@ The workflow maps checkable statements in a skill to existing checks and lists u
 
 **Input:** A SKILL.md and existing eval rows or executable task checks to map against its requirements.
 
-**Scope and limits:** LLM-estimated candidates from `eval skill-coverage` ([#441](https://github.com/intel/dokimi/pull/441)), not a verified coverage score.
+**Scope and limits:** LLM-estimated candidates from `eval skill-coverage` ([#441](https://github.com/intel/dokimi/pull/441) (merged)), not a verified coverage score.
 
 **Result:** A rule-to-check mapping for review; see `dokimi eval skill-coverage --help`.
 
@@ -142,7 +142,7 @@ Check whether tasks have useful headroom and protect held-out evaluation materia
 
 **Input:** Recorded arm outcomes, reference question content and repetition/cache provenance.
 
-**Scope and limits:** Headroom and run hygiene; the replay provenance fix ([#596](https://github.com/intel/dokimi/pull/596)) is on main.
+**Scope and limits:** Headroom and run hygiene; the replay provenance fix ([#596](https://github.com/intel/dokimi/pull/596) (merged)) is on main.
 
 **Result:** Headroom diagnostics identifying cases with little room to distinguish variants.
 

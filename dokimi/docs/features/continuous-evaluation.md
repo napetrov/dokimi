@@ -22,7 +22,7 @@ Inspect persisted run artifacts, reports and dashboards without rerunning the mo
 
 **Input:** Stored run artifacts readable by the selected report reader, a saved baseline, comparable candidate results and explicit regression thresholds.
 
-**Scope and limits:** Support varies by track; unified JSON envelope on main ([#590](https://github.com/intel/dokimi/pull/590)). Baseline gates and the reusable no-model CI workflow are on main; full record/revalidate in [#318](https://github.com/intel/dokimi/issues/318)/[#121](https://github.com/intel/dokimi/issues/121)/[#138](https://github.com/intel/dokimi/issues/138).
+**Scope and limits:** Support varies by track; unified JSON envelope on main ([#590](https://github.com/intel/dokimi/pull/590) (merged)). Baseline gates and the reusable no-model CI workflow are on main; full record/revalidate in [#318](https://github.com/intel/dokimi/issues/318)/[#121](https://github.com/intel/dokimi/issues/121)/[#138](https://github.com/intel/dokimi/issues/138).
 
 **Result:** Inspectable stored artifacts and reports, and baseline comparison findings under configured thresholds.
 
@@ -42,7 +42,7 @@ The repository security comparison (`cli.py repo security`) surfaces unsafe beha
 
 **Input:** Recorded repository-run traces per arm and baseline; additional canary/exec/egress evidence where available.
 
-**Scope and limits:** PR [#588](https://github.com/intel/dokimi/pull/588) / [#360](https://github.com/intel/dokimi/issues/360); broader traps and instrumentation remain incomplete.
+**Scope and limits:** PR [#588](https://github.com/intel/dokimi/pull/588) (merged) / [#360](https://github.com/intel/dokimi/issues/360); broader traps and instrumentation remain incomplete.
 
 **Result:** Per-arm unsafe-behaviour evidence against a baseline; isolation alone does not establish safety.
 

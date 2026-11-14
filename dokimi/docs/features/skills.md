@@ -103,7 +103,7 @@ Run the existing skill/catalog validation before paid evaluation; structural war
 
 **Input:** Skill metadata, descriptions, paths and bundle structure in the catalog being checked.
 
-**Scope and limits:** Checks on main, including `path-missing` ([#556](https://github.com/intel/dokimi/pull/556)) and the `allowed-tools-unrestricted-bash` warning ([#557](https://github.com/intel/dokimi/pull/557)). PRs [#558](https://github.com/intel/dokimi/pull/558) and [#559](https://github.com/intel/dokimi/pull/559) are not on main yet.
+**Scope and limits:** Checks on main, including `path-missing` ([#556](https://github.com/intel/dokimi/pull/556) (merged)) and the `allowed-tools-unrestricted-bash` warning ([#557](https://github.com/intel/dokimi/pull/557) (merged)). PRs [#558](https://github.com/intel/dokimi/pull/558) and [#559](https://github.com/intel/dokimi/pull/559) are not on main yet.
 
 **Result:** Structural findings from existing checks; proposed packaging findings remain separate until merged.
 
