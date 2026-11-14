@@ -170,6 +170,7 @@ nav:
       - CLI and artifacts: development/interfaces.md
       - Known limitations: development/limitations.md
       - Open work index: development/work-index.md
+  - How the evaluation works: how-evaluation-works.md
   - All guides: documentation-index.md
   - CLI reference: reference/cli/
   - API reference: reference/api/

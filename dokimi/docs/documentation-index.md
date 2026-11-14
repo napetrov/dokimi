@@ -21,6 +21,7 @@ code.
 - [Agents and CI](start/automation.md).
 - [Read results](start/results.md).
 - [Contributors](start/contributors.md).
+- [How the evaluation works](how-evaluation-works.md): the evaluation flow, the question each part answers, and why the evidence is kept per artifact.
 
 ## Feature catalog
 

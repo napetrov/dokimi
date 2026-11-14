@@ -43,10 +43,9 @@ The illustrations explain examples, not measured results. Feature cards distingu
 <a id="what-measuring-shows"></a>
 <a id="what-can-be-compared-arms"></a>
 <a id="example-results"></a>
-<a id="how-the-evaluation-flows"></a>
-<a id="asking-a-different-question"></a>
-<a id="why-this-matters"></a>
 <a id="explore"></a>
+
+How the evaluation flows, what each part answers and why it matters: [how the evaluation works](how-evaluation-works.md).
 
 Earlier overview topics now live in [measurement concepts](what-it-measures.md), [results](start/results.md), and the [complete guide index](documentation-index.md).
 
@@ -59,6 +58,5 @@ Earlier overview topics now live in [measurement concepts](what-it-measures.md),
 <a id="content-novelty"></a>
 <a id="repository-evaluation"></a>
 <a id="extending-dokimi"></a>
-<a id="methodology"></a>
 
 [Features in development](development/README.md) describes the work underway and its limits; [known limitations](development/limitations.md) helps interpret current results.
