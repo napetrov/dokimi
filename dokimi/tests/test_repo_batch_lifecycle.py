@@ -189,7 +189,8 @@ def test_the_mixed_execution_refusal_is_per_batch_arm_and_model():
     with pytest.raises(CellFileError, match="e1, unrecorded"):
         refuse_mixed_executions([_cell("a", "m", "e1"), {"arm": "a", "model": "m"}], "b1")
     # the remedy is a --force run over the whole batch: an arm-only rerun is refused while another arm holds the older id
-    with pytest.raises(CellFileError, match="rerun every arm and model of the batch with --force"):
+    with pytest.raises(CellFileError, match="rerun every arm and model of the batch with --force and "
+                                            "the batch's --task and --reps"):
         refuse_mixed_executions([_cell("a", "m", "e1"), _cell("a", "m", "e2")], "b1")
 
 
@@ -203,3 +204,18 @@ def test_compare_refuses_only_a_compared_row_of_two_executions(setup):
     with pytest.raises(CellFileError, match="arm guidance:bridge, model m-1 ran with executions"):
         compare([b1], "guidance:none", ["guidance:bridge"])
     assert compare([b1], "guidance:none", ["guidance:raw"])["comparisons"]  # the mixed arm is not compared
+
+
+def test_compare_with_a_model_refuses_only_a_mixed_row_of_that_model(setup):
+    # m-2 alone has the mixed arm: --model m-1 compares rows that are not mixed, so it must not be refused
+    _run(setup, "--task", "fix_add", "--arm", "guidance:none,guidance:bridge", "--reps", "2", models=("m-1", "m-2"))
+    b1 = setup["out"] / "b1"
+    target = b1 / "fix_add__guidance-bridge__m-2__r1/result.json"
+    rec = json.loads(target.read_text())
+    rec["execution"]["id"] = "old"
+    target.write_text(json.dumps(rec))
+    assert compare([b1], "guidance:none", ["guidance:bridge"], models=["m-1"])["comparisons"]
+    with pytest.raises(CellFileError, match="arm guidance:bridge, model m-2 ran with executions"):
+        compare([b1], "guidance:none", ["guidance:bridge"], models=["m-2"])
+    with pytest.raises(CellFileError, match="arm guidance:bridge, model m-2 ran with executions"):
+        compare([b1], "guidance:none", ["guidance:bridge"])
