@@ -565,3 +565,17 @@ def test_a_test_the_base_branch_deleted_cannot_hide_a_removal(tmp_path, monkeypa
     _git(tmp_path, "checkout", "-q", "pr")
     monkeypatch.setattr(ctn, "REPO", tmp_path)
     assert ctn.findings("advanced", "pr") == [("tests/test_a.py", "test_close", 0, "removed")]
+
+
+def test_swapped_tolerances_inside_one_assert_are_named():
+    base = "import pytest\n\n\ndef test_a(f, g):\n    assert f() == pytest.approx(1, rel=1e-9) and g() == pytest.approx(1, rel=1e-3)\n"
+    swapped = base.replace("rel=1e-9", "rel=TMP").replace("rel=1e-3", "rel=1e-9").replace("rel=TMP", "rel=1e-3")
+    assert [what for _, _, what in ctn.compare(base, swapped)] == ["loosens a tolerance"]
+
+
+def test_an_abs_only_approx_reads_its_relative_tolerance_as_zero():
+    base = "import pytest\n\n\ndef test_a():\n    assert f() == pytest.approx(1, abs=1e-12)\n"
+    assert [what for _, _, what in ctn.compare(base, base.replace("abs=1e-12)", "rel=1e-7, abs=1e-12)"))] == [
+        "loosens a tolerance"]
+    rel_before = base.replace("abs=1e-12)", "rel=1e-9, abs=1e-12)")
+    assert ctn.compare(rel_before, base) == []

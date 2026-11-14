@@ -167,14 +167,20 @@ class _StripTolerances(ast.NodeTransformer):
 
 
 def _assert_contexts(stmt: ast.stmt) -> dict[int, str]:
-    """For each call inside an ``assert`` under ``stmt``: the assert's test without its tolerances,
-    so that two comparisons that differ only by their operands are told apart."""
+    """For each call inside an ``assert`` under ``stmt``: the innermost comparison it sits in without
+    its tolerances (else the assert's test), so that comparisons told apart only by their operands,
+    or by which tolerance goes with which operand, are not confused with each other."""
     found: dict[int, str] = {}
     for sub in ast.walk(stmt):
         if isinstance(sub, ast.Assert):
             text = ast.dump(_StripTolerances().visit(copy.deepcopy(sub.test)))
             found.update({id(call): text for call in ast.walk(sub.test)
                           if isinstance(call, ast.Call) and id(call) not in found})
+            # ast.walk is breadth-first: an outer comparison is seen before the ones inside it, which overwrite it
+            for compare in ast.walk(sub.test):
+                if isinstance(compare, ast.Compare):
+                    inner = ast.dump(_StripTolerances().visit(copy.deepcopy(compare)))
+                    found.update({id(call): inner for call in ast.walk(compare) if isinstance(call, ast.Call)})
     return found
 
 
@@ -194,6 +200,8 @@ def _read_tolerances(call: ast.Call, shape: Shape, context: str | None = None) -
                 tolerances["rel"] = 0.0
         elif value is None or isinstance(value, (int, float)):
             tolerances[str(kw.arg)] = math.inf if value is None else float(value)
+    if api == "approx" and "abs" in given and not any(kw.arg == "rel" for kw in named):
+        tolerances["rel"] = 0.0  # pytest.approx with abs alone: the relative part is unset, so it is 0
     for kind, default in API_DEFAULTS.get(api, {}).items():
         tolerances.setdefault(kind, default)
     others = [kw for kw in call.keywords if kw not in named]
