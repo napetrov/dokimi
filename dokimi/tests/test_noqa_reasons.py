@@ -15,13 +15,14 @@ from __future__ import annotations
 
 import io
 import re
+import subprocess
 import tokenize
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CODES = {"BLE001", "S110", "S112"}
 # ruff's extend-exclude in pyproject.toml, plus the virtualenvs a checkout may hold.
-SKIP = ("benchmarks/", "data/", "tests/fixtures/task_formats/", ".venv/", "venv/", "build/")
+SKIP = ("benchmarks/", "data/", "tests/fixtures/task_formats/", ".venv/", "venv/", "build/", ".tox/", "dist/")
 _NOQA = re.compile(r"#\s*(?:(?:ruff|flake8)\s*:\s*)?noqa:\s*(?P<codes>[A-Z]+[0-9]+(?:[\s,]+[A-Z]+[0-9]+)*)(?P<rest>.*)$", re.I)
 _REASON = re.compile(r"^\s*(?:[-—:(]+\s*)?(?P<text>.*?)\)?\s*$")
 
@@ -42,12 +43,22 @@ def unexplained(source: str) -> list[int]:
 
 
 def _python_files() -> list[Path]:
-    out = []
-    for path in sorted(ROOT.rglob("*.py")):
-        rel = path.relative_to(ROOT).as_posix()
-        if not rel.startswith(SKIP):
-            out.append(path)
-    return out
+    # The files ruff checks: what git does not hide (.gitignore, so mutants/ is out too).
+    listed = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", "*.py"],
+        cwd=ROOT, capture_output=True, text=True, check=True).stdout
+    return [ROOT / rel for rel in sorted(listed.split("\0"))
+            if rel and not rel.startswith(SKIP)]
+
+
+def test_python_files_follow_gitignore_and_skip_tox(tmp_path: Path, monkeypatch) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / ".gitignore").write_text("mutants/\n", encoding="utf-8")
+    for rel in ("a.py", "mutants/scratch.py", ".tox/py311/x.py", "pkg/b.py"):
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text("x = 1\n", encoding="utf-8")
+    monkeypatch.setitem(globals(), "ROOT", tmp_path)
+    assert [p.relative_to(tmp_path).as_posix() for p in _python_files()] == ["a.py", "pkg/b.py"]
 
 
 def test_every_blind_except_noqa_has_a_reason() -> None:
@@ -91,3 +102,15 @@ def test_a_file_level_noqa_needs_a_reason_too() -> None:
     assert unexplained("# ruff: noqa: BLE001, S110\n" + src) == [1]
     assert unexplained("# flake8: noqa: BLE001\n" + src) == [1]
     assert unexplained("# ruff: noqa: BLE001 - every probe failure is logged upstream\n" + src) == []
+
+
+# coverage.py's default exclude pattern: the pragma must start with a `#` of its own.
+_COVERAGE_PRAGMA = re.compile(r"#\s*(pragma|PRAGMA)[:\s]?\s*(no|NO)\s*(cover|COVER)")
+
+
+def test_a_reason_does_not_hide_a_coverage_pragma() -> None:
+    bad = [f"{p.relative_to(ROOT).as_posix()}:{n}"
+           for p in _python_files() if p.resolve() != Path(__file__).resolve()
+           for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
+           if "noqa" in line and "pragma: no cover" in line and not _COVERAGE_PRAGMA.search(line)]
+    assert not bad, "a noqa reason swallowed a coverage pragma: " + ", ".join(bad)
