@@ -579,7 +579,7 @@ def test_the_name_search_and_the_document_reads_hold_at_the_edges(tmp_path, body
         assert unnamed in message
 
 
-def test_a_windows_path_with_an_underscore_name_still_names_its_file(tmp_path):
+def test_a_windows_path_with_an_escapable_name_still_names_its_file(tmp_path):
     # Read both ways: the escape reading drops the separator, so the separator reading must stay.
     review = _review_with_texts(tmp_path, "Run `scripts\\~helper.py`.\n", {"scripts/~helper.py": "x\n"})
     assert _unreferenced(review) == []
