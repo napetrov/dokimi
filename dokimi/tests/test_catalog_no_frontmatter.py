@@ -275,3 +275,12 @@ def test_an_empty_file_or_a_bom_before_frontmatter_is_not_plain_markdown(tmp_pat
     codes = [f.code for r in review_skills(read_skill_manifest(tmp_path)) if r for f in r.findings]
     assert "not-a-skill-no-frontmatter" not in codes
 
+
+def test_prose_after_a_comment_on_its_line_is_the_description():
+    lines = ["# T", "", "<!-- note --> Real description."]
+    assert _block(no_frontmatter_message(lines, "t", at_root=True))["description"] == "Real description."
+
+
+def test_a_comment_that_opens_mid_line_is_taken_out_with_its_lines():
+    lines = ["# T", "", "Intro words <!-- start", "hidden note", "-->", "after."]
+    assert _block(no_frontmatter_message(lines, "t", at_root=True))["description"] == "Intro words after."
