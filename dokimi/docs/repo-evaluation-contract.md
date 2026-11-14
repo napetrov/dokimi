@@ -2315,8 +2315,8 @@ python cli.py repo compare repo-runs/authoring --baseline guidance:none --metric
   report` refuses such a batch and `repo compare` such a compared row, naming
   both `id`s, until a `--force` run over every arm and model of the batch (the same `--task` and `--reps`) reruns them. A plan naming one cell twice (a
   repeated `--task` or `--model`, or two `--model` strings with one directory
-  name, `a/b` and `a:b`, or names that differ only in case) is refused before any agent starts. Ctrl-C lets the
-  running cells finish and starts no queued one. A batch stays on the eval tree it
+  name, `a/b` and `a:b`, or names that differ only in case) is refused before any agent starts.
+  Ctrl-C lets the running cells finish and starts no queued one. A batch stays on the eval tree it
   started with: its revision, or for a working tree the digests of its `eval_dir`
   and of the image build context. A batch with a task that
   names a `dokimi:` grader (or a task directory that cannot be read) also stays on the built-in graders' sources.

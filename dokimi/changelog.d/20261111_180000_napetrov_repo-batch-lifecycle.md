@@ -1,9 +1,11 @@
 ### Fixed
 
 - **`repo run` refuses a plan that names one cell twice** — a repeated `--task` or `--model`, or two
-  `--model` strings with one directory name (`a/b` and `a:b`), or names that differ only in case, put two runs in one cell directory;
-  with `--jobs 2` each removed the other's files and `result.json` sat beside the other attempt's
-  `meta.json` and answer. The run now stops before any agent starts, naming the cell.
+  names that share one cell directory (`a/b` and `a:b`), put two runs in one cell directory; with
+  `--jobs 2` each removed the other's files and `result.json` sat beside the other attempt's
+  `meta.json` and answer. The run now stops before any agent starts, naming the cell. Names that
+  differ only in case are refused on every system, since they share one directory on a
+  case-insensitive volume.
 - **`repo report` and `repo compare` refuse an arm and model whose cells hold two executions** — a
   `--force` run with another execution that stopped part way (Ctrl-C, a crash, a failed cell), or a
   harness binary replaced while the batch ran, left cells of two executions that were pooled in one
