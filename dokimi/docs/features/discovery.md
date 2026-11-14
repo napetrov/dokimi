@@ -38,11 +38,11 @@ A file on disk is not necessarily listed to the agent, and a listed skill or ins
 
 **Availability:** Partial — implemented core with proposed extensions.
 
-`novelty routing` scores only requests that should select the skill: by lexical overlap without `--model`, and with `--model` by the model's pick from the cards, an upper bound on what a harness selects. Test requests that should not select it, and selection in real Claude Code runs, with [`catalog trigger-probe`](../evaluating-treatments.md#skill-selection-does-the-agent-load-the-right-skill).
+`skill routing` (all-vs-all: `catalog routing`) scores only requests that should select the skill: by lexical overlap without `--model`, and with `--model` by the model's pick from the cards, an upper bound on what a harness selects. Test requests that should not select it, and selection in real Claude Code runs, with [`catalog trigger-probe`](../evaluating-treatments.md#skill-selection-does-the-agent-load-the-right-skill).
 
 **Input:** The skill or catalog, actual competing skills and representative selection/non-selection requests.
 
-**Scope and limits:** Existing routing; CLI relocation in PR [#595](https://github.com/intel/dokimi/pull/595). Need relevance also matters.
+**Scope and limits:** Existing routing, under `skill routing` and `catalog routing`. Need relevance also matters.
 
 **Result:** Routing outcomes against actual competing skills and user queries.
 
